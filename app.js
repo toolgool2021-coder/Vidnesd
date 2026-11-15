@@ -10,6 +10,13 @@ const toast=m=>{const el=document.createElement("div");el.className="toast";el.t
 const err=e=>{const msg=[e.code||"",e.message||String(e)].filter(Boolean).join(" · ").replace(/^Firebase: /,"").slice(0,320);toast(msg);console.error("[VIDNESD]",e)};
 // Free Spark demo. Game progress is stored locally, not protected from editing.
 const DEMO_CASES=Array.from({length:16},(_,i)=>({id:"case"+i,name:["Starter","Neon Dreams","Cosmic","Wildlife","Ocean","Fantasy","Stardust","Mystic","Phoenix","Moonlight","Cyber","Galaxy","Crystal","Royal","Eclipse","Infinity"][i],emoji:["🎁","🌈","🪐","🦊","🌊","🐉","🌠","🔮","🔥","🌙","🤖","🌌","💎","👑","🌑","♾️"][i],price:[100,180,250,350,450,550,650,750,900,1100,1300,1500,1750,2000,2400,3000][i],tier:Math.min(3,Math.floor(i/4))}));
+const EXTRA_CASES=[
+["Aurora","🌌",420,1],["Jungle Relics","🌿",520,1],["Deep Space","🚀",800,2],["Pixel World","👾",950,2],
+["Golden Age","🏆",1200,2],["Frozen Kingdom","❄️",1450,2],["Dark Matter","🕳️",1800,3],["Dragon Realm","🐲",2100,3],
+["Arcade Legends","🕹️",260,0],["Candy Dreams","🍬",300,0],["Ocean Depths","🐙",600,1],["Royal Vault","🏰",2700,3],
+["Neon City","🌃",1050,2],["Mythic Forest","🍄",700,1],["Time Machine","⏳",1650,3],["Celestial","☀️",3200,3]
+];
+DEMO_CASES.push(...EXTRA_CASES.map(([name,emoji,price,tier],i)=>({id:"case"+(16+i),name,emoji,price,tier})));
 const DEMO_EMOJI=["🌙","☄️","🦊","🦋","🪐","🐉","🦄","🌸","🌊","⚡","💎","🔮","🧿","🦉","🐺","🦁","🌌","🔥","🍀","🌈","🦅","🐈","🪷","🧊","🌠","🎭","🪼","🦈","🌻","🎐","🧬","🛰️"];
 const DEMO_NAMES=["Moonlight","Comet","Fox Spirit","Nebula Wing","Saturn","Ancient Dragon","Unicorn","Sakura","Tidal","Thunder","Crystal","Oracle","Eye of Cosmos","Night Owl","Silver Wolf","Solar Lion","Galaxy","Phoenix","Lucky Clover","Prism","Sky Hunter","Starlit Cat","Lotus","Glacier","Starfall","Phantom","Deep Sea","Ocean King","Sunflower","Wind Chime","Genesis","Voyager"];
 const DEMO_RARITIES=["common","rare","epic","legendary"],DEMO_VALUES={common:25,rare:90,epic:350,legendary:1300};
@@ -58,7 +65,7 @@ function stats(){return '<div class="stats"><div class="stat"><span class="muted
 function render(){document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#balance").textContent=fmt(user?.balance);$("#authBtn").textContent=current?"Выйти":"Войти";
 if(!user){app.innerHTML='<section class="hero"><div><div class="eyebrow">COLLECT · DISCOVER · LEVEL UP</div><h1>Твоя вселенная карточек</h1><p>Собирай уникальные коллекции, открывай бесплатные игровые кейсы, выполняй задания и поднимайся в рейтинге.</p><div class="actions"><button class="primary" id="join">Начать путешествие</button></div></div><div class="hero-art">💠</div></section><h2>Коллекционный мир</h2><div class="grid">'+["🌙","🐉","💎","🪐"].map((e,i)=>cardView({emoji:e,name:["Moonlight","Dragon","Crystal","Saturn"][i],rarity:["common","rare","epic","legendary"][i],value:0}).replace("0 VC","Коллекционная карточка")).join("")+'</div>';$("#join").onclick=()=>current?verifyModal():authModal();return}
 if(page==="home"){app.innerHTML='<section class="hero"><div><div class="eyebrow">WELCOME TO VIDNESD</div><h1>Открой свой Cardverse</h1><p>Собирай карточки, повышай уровень и открывай новые коллекции. Все награды исключительно игровые.</p><div class="actions"><button class="primary go" data-go="cases">Открыть кейсы</button><button class="secondary daily">Ежедневный бонус +150 VC</button><button class="secondary free-vc">Получить +10 000 VC</button></div></div><div class="hero-art">🪐</div></section>'+stats()+'<h2>Популярные кейсы</h2><div class="grid">'+cases.slice(0,8).map(caseView).join("")+'</div>'}
-if(page==="cases")app.innerHTML='<div class="section-head"><div><div class="eyebrow">CARD PACKS</div><h1>Все кейсы</h1><p>16 тематических наборов. Шансы редкости показаны перед открытием.</p></div></div><div class="grid">'+cases.map(caseView).join("")+'</div>';
+if(page==="cases")app.innerHTML='<div class="section-head"><div><div class="eyebrow">CARD PACKS</div><h1>Все кейсы</h1><p>32 тематических набора. Шансы редкости показаны перед открытием.</p></div></div><div class="grid">'+cases.map(caseView).join("")+'</div>';
 if(page==="inventory"){const owned=cards.filter(c=>user.inventory?.[c.id]>0);app.innerHTML='<div class="eyebrow">MY COLLECTION</div><h1>Инвентарь</h1><p>Собрано '+owned.length+' из '+cards.length+' видов карточек</p>'+(owned.length?'<div class="grid">'+owned.map(c=>cardView(c,user.inventory[c.id])).join("")+'</div>':'<div class="empty">Пока пусто. Открой первый кейс, чтобы получить карточку.</div>')}
 if(page==="upgrade"){renderUpgrade();return}
 if(page==="quests"){app.innerHTML='<div class="eyebrow">REWARDS</div><h1>Задания</h1><p>Получай бесплатные VC за достижения и активность.</p>'+quests.map(q=>{const val=user[q.field]||0,done=user.claimed?.[q.id];return '<div class="quest"><div><strong>'+escape(q.name)+'</strong><span class="muted">'+Math.min(val,q.target)+' / '+q.target+' · +'+q.reward+' VC</span></div><button class="'+(done?'secondary':'primary')+' claim" data-id="'+q.id+'" '+(done||val<q.target?'disabled':'')+'>'+(done?'Получено':val>=q.target?'Забрать':'В процессе')+'</button></div>'}).join("")}
@@ -79,7 +86,10 @@ async function loadLeaders(){return;try{const r=await call("leaderboard");const 
 function confetti(){if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let openingStyle="roulette",upgradeSelected=[],upgradeTarget="";
-const OPEN_STYLES=[["roulette","🎰 Рулетка"],["reveal","🎁 Раскрытие"],["carousel","🌀 Карусель"],["drop","💫 Падение"],["cinematic","✨ Кино"]];
+const OPEN_STYLES=[["roulette","🎰 Рулетка"],["carousel","🌀 Карусель"],["reveal","🎁 Раскрытие"],["drop","💫 Падение"],["cinematic","✨ Кино"],["portal","🪐 Портал"],["shatter","💎 Кристалл"],["flip","🃏 Переворот"],["orbit","🌠 Орбита"],["scan","🔍 Сканер"],["pulse","💜 Импульс"],["meteor","☄️ Метеор"]];
+let openingDuration="normal";
+const OPEN_DURATIONS=[["normal","Обычная"],["long","Длинная"],["epic","Кинематографичная"]];
+
 function renderUpgrade(){
  const owned=cards.filter(c=>(user.inventory?.[c.id]||0)>0);
  if(!upgradeTarget)upgradeTarget=cards.find(c=>c.value>=350)?.id||cards[0]?.id;
@@ -102,28 +112,34 @@ function renderUpgrade(){
 }
 async function openCase(id){
  const c=cases.find(x=>x.id===id);if(!c)return;const w=weights[c.tier];
- show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><div class="opening-styles">'+OPEN_STYLES.map(([id,label])=>'<button class="style-choice '+(openingStyle===id?'selected':'')+'" data-style="'+id+'">'+label+'</button>').join("")+'</div><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
+ show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери анимацию</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
+ document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#preview").onclick=()=>show('<h2>Карточки коллекции</h2><div class="grid">'+cards.map(x=>cardView(x)).join("")+'</div>');
  $("#startRoll").onclick=()=>lock(async()=>{
   if(user.balance<c.price)throw Error("Недостаточно VC");
-  $("#startRoll").disabled=true;document.querySelectorAll("[data-style]").forEach(b=>b.disabled=true);
+  const chosenStyle=openingStyle,chosenDuration=openingDuration;
+  $("#startRoll").disabled=true;document.querySelectorAll("[data-style],[data-duration]").forEach(b=>b.disabled=true);
   const r=await call("openCase",{caseId:id,operationId:crypto.randomUUID()});
   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
   const area=$("#rollArea");if(!area)return;
-  const pick=()=>cards[Math.floor(Math.random()*cards.length)];
-  if(openingStyle==="roulette"||openingStyle==="carousel"){
-   const count=openingStyle==="roulette"?46:28,winIndex=count-8;
+  const duration=chosenDuration==="epic"?12500:chosenDuration==="long"?9500:7200;
+  const pick=()=>cards[randomInt(cards.length)];
+  if(chosenStyle==="roulette"||chosenStyle==="carousel"){
+   const count=chosenDuration==="epic"?86:chosenDuration==="long"?68:54,winIndex=count-8;
    const pool=Array.from({length:count},(_,i)=>i===winIndex?r.card:pick());
-   area.innerHTML='<div class="roulette-window '+(openingStyle==="carousel"?'carousel-mode':'')+'"><div class="roulette-track">'+pool.map(x=>'<div class="roulette-item rarity-'+x.rarity+'"><div><div class="emoji">'+x.emoji+'</div><small>'+escape(x.name)+'</small></div></div>').join("")+'</div></div>';
+   area.innerHTML='<div class="roulette-window '+(chosenStyle==="carousel"?'carousel-mode':'')+'"><div class="roulette-track">'+pool.map(x=>'<div class="roulette-item rarity-'+x.rarity+'"><div><div class="emoji">'+x.emoji+'</div><small>'+escape(x.name)+'</small></div></div>').join("")+'</div></div>';
    const track=area.querySelector(".roulette-track"),windowEl=area.querySelector(".roulette-window");
-   await sleep(80);const width=138,center=windowEl.clientWidth/2,offset=winIndex*width+65-center;
-   track.style.transition='transform '+(openingStyle==="carousel"?'5':'6.8')+'s cubic-bezier(.09,.72,.13,1)';
+   await sleep(90);const item=track.querySelector(".roulette-item"),width=item.getBoundingClientRect().width+parseFloat(getComputedStyle(track).gap||"0"),center=windowEl.clientWidth/2;
+   const offset=winIndex*width+item.getBoundingClientRect().width/2-center;
+   track.style.transition='transform '+duration+'ms cubic-bezier(.08,.76,.11,1)';
    track.style.transform='translateX(-'+offset+'px)';
-   await sleep(openingStyle==="carousel"?5150:6950);
+   await sleep(duration+150);
   }else{
-   area.innerHTML='<div class="opening-stage '+openingStyle+'"><div class="opening-object">'+(openingStyle==="reveal"?'🎁':openingStyle==="drop"?'💠':'✦')+'</div><div class="opening-stage-label">'+(openingStyle==="reveal"?'Раскрытие тайны':openingStyle==="drop"?'Карточка приближается':'Легендарный момент')+'</div></div>';
-   await sleep(openingStyle==="cinematic"?3300:2500);
+   const icons={reveal:"🎁",drop:"💠",cinematic:"✦",portal:"🪐",shatter:"💎",flip:"🃏",orbit:"🌠",scan:"🔍",pulse:"💜",meteor:"☄️"};
+   const names={reveal:"Раскрытие тайны",drop:"Карточка приближается",cinematic:"Кинематографическое открытие",portal:"Открытие портала",shatter:"Кристалл раскрывается",flip:"Переворот карточки",orbit:"Орбитальное вращение",scan:"Сканирование находки",pulse:"Энергетический импульс",meteor:"Метеоритный след"};
+   area.innerHTML='<div class="opening-stage '+chosenStyle+'" style="--opening-time:'+duration+'ms"><div class="opening-aura"></div><div class="opening-object">'+icons[chosenStyle]+'</div><div class="opening-stage-label">'+names[chosenStyle]+'</div><div class="opening-progress"><span></span></div></div>';
+   await sleep(duration);
   }
   if(!document.body.contains(area))return;
   area.innerHTML='<div class="result rarity-'+r.card.rarity+'"><div class="big">'+r.card.emoji+'</div><h2>'+escape(r.card.name)+'</h2><p>'+r.card.rarity.toUpperCase()+' · '+r.card.value+' VC</p><button class="primary" id="again">Ещё раз</button></div>';
