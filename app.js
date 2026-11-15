@@ -65,7 +65,7 @@ async function call(name,data={}){
  if(!verified())throw Error("Подтверди электронную почту");
  let u=demoRead();
  if(!u){u={uid:current.uid,nick:(current.email||"Collector").split("@")[0].slice(0,20),balance:1000,xp:0,opens:0,collected:0,inventory:{},claimed:{},lastDaily:"",createdAt:Date.now(),operations:{}};demoWrite(u)}
- if(name==="bootstrap")return {user:u,cases:DEMO_CASES,cards:DEMO_CARDS,quests:DEMO_QUESTS,weights:DEMO_WEIGHTS};
+ if(name==="bootstrap")return {user:u,cases:DEMO_CASES,cards:[...DEMO_CARDS,...(u.customCards||[])],quests:DEMO_QUESTS,weights:DEMO_WEIGHTS};
  if(name==="leaderboard")return {leaders:[],demo:true};
  if(name==="saveShowcase"){const ids=Array.isArray(data.ids)?data.ids:[];if(ids.length>5||new Set(ids).size!==ids.length||ids.some(id=>!u.inventory[id]))throw Error("Можно выставить до 5 принадлежащих тебе карточек");u.showcase=ids;demoWrite(u);return {showcase:ids}}
  if(name==="craftCard"){
@@ -100,10 +100,19 @@ async function call(name,data={}){
   u.collected=Object.keys(u.inventory).length;demoWrite(u);
   return {click,risk,broken,finished,card,pendingCraft:u.pendingCraft,inventory:u.inventory,collected:u.collected};
  }
+ if(name==="createCustomCard"){
+  const name=String(data.name||"").trim(),emoji=String(data.emoji||"💠").trim(),price=2500;
+  if(name.length<3||name.length>28||emoji.length>8||/[<>]/.test(name+emoji))throw Error("Название 3–28 символов, значок до 8 символов");
+  if(u.balance<price)throw Error("Нужно 2 500 VC для создания");
+  if((u.customCards||[]).length>=20)throw Error("Лимит 20 авторских карточек");
+  const card={id:"custom_"+crypto.randomUUID(),name,emoji,rarity:"rare",value:500,creator:current.uid,custom:true};
+  u.balance-=price;u.customCards=[...(u.customCards||[]),card];u.inventory[card.id]=1;u.collected=Object.keys(u.inventory).length;demoWrite(u);
+  return {card,balance:u.balance,inventory:u.inventory,collected:u.collected};
+ }
  if(name==="freeVC"){const owner=current.uid==="3gXPMPACBeftCtoSGqC6mL5T2iw2",reward=owner?10000:3000,wait=20*60*1000,now=Date.now();if(!owner&&now-(u.lastFreeVC||0)<wait)throw Error("Следующий бонус через "+Math.ceil((wait-(now-u.lastFreeVC))/60000)+" мин");u.balance+=reward;if(!owner)u.lastFreeVC=now;demoWrite(u);return {balance:u.balance,reward,nextAt:owner?0:now+wait}};
  if(name==="claimDaily"){const day=new Date().toISOString().slice(0,10);if(u.lastDaily===day)throw Error("Сегодня награда уже получена");u.balance+=150;u.lastDaily=day;demoWrite(u);return {balance:u.balance,lastDaily:day,reward:150}}
  if(name==="claimQuest"){const q=DEMO_QUESTS.find(x=>x.id===data.questId);if(!q)throw Error("Задание не найдено");if(u.claimed[q.id])throw Error("Награда уже получена");if(u[q.field]<q.target)throw Error("Задание ещё не выполнено");u.claimed[q.id]=true;u.balance+=q.reward;demoWrite(u);return {balance:u.balance,claimed:u.claimed,reward:q.reward}}
- if(name==="sellCard"){const card=DEMO_CARDS.find(x=>x.id===data.cardId);if(!card||!u.inventory[card.id])throw Error("Карточка отсутствует");u.inventory[card.id]--;if(!u.inventory[card.id])delete u.inventory[card.id];u.balance+=card.value;u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);return {inventory:u.inventory,balance:u.balance,collected:u.collected,showcase:u.showcase}}
+ if(name==="sellCard"){const card=[...DEMO_CARDS,...(u.customCards||[])].find(x=>x.id===data.cardId);if(!card||!u.inventory[card.id])throw Error("Карточка отсутствует");u.inventory[card.id]--;if(!u.inventory[card.id])delete u.inventory[card.id];u.balance+=card.value;u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);return {inventory:u.inventory,balance:u.balance,collected:u.collected,showcase:u.showcase}}
  if(name==="upgradeCard"){const target=DEMO_CARDS.find(x=>x.id===data.targetId),selected=Array.isArray(data.sourceIds)?data.sourceIds:[];if(!target||!selected.length||selected.length>5)throw Error("Выбери от 1 до 5 карточек");const counts={};for(const id of selected)counts[id]=(counts[id]||0)+1;let total=0;for(const [id,count] of Object.entries(counts)){const card=DEMO_CARDS.find(x=>x.id===id);if(!card||card.value>=target.value||Number(u.inventory[id]||0)<count)throw Error("Недостаточно подходящих карточек");total+=card.value*count}const chance=Math.min(100,Math.round(total/target.value*10000)/100),roll=randomInt(1000000)/10000,success=roll<chance;for(const [id,count] of Object.entries(counts)){u.inventory[id]-=count;if(!u.inventory[id])delete u.inventory[id]}if(success)u.inventory[target.id]=(u.inventory[target.id]||0)+1;u.collected=Object.keys(u.inventory).length;demoWrite(u);return {inventory:u.inventory,collected:u.collected,card:target,chance,roll,success}};
  if(name==="openCase"){
   const cs=DEMO_CASES.find(x=>x.id===data.caseId);if(!cs)throw Error("Кейс не найден");
@@ -135,6 +144,7 @@ if(!user){app.innerHTML='<section class="hero"><div><div class="eyebrow">COLLECT
 if(page==="home"){app.innerHTML='<section class="hero"><div><div class="eyebrow">WELCOME TO VIDNESD</div><h1>Открой свой Cardverse</h1><p>Собирай карточки, повышай уровень и открывай новые коллекции. Все награды исключительно игровые.</p><div class="actions"><button class="primary go" data-go="cases">Открыть кейсы</button><button class="secondary daily">Ежедневный бонус +150 VC</button><button class="secondary free-vc">'+(current.uid==="3gXPMPACBeftCtoSGqC6mL5T2iw2"?"Получить +10 000 VC · Владелец":Date.now()-(user.lastFreeVC||0)<1200000?"Бонус через "+Math.ceil((1200000-(Date.now()-user.lastFreeVC))/60000)+" мин":"Получить +3 000 VC · каждые 20 мин")+'</button></div></div><div class="hero-art">🪐</div></section>'+stats()+'<h2>Популярные кейсы</h2><div class="grid">'+cases.slice(0,8).map(caseView).join("")+'</div>'}
 if(page==="cases")app.innerHTML='<div class="section-head"><div><div class="eyebrow">CARD PACKS</div><h1>Все кейсы</h1><p>76 тематических наборов. Шансы редкости показаны перед открытием.</p></div></div><div class="grid">'+cases.map(caseView).join("")+'</div>';
 if(page==="inventory"){const owned=cards.filter(c=>user.inventory?.[c.id]>0);app.innerHTML='<div class="eyebrow">MY COLLECTION</div><h1>Инвентарь</h1><p>Собрано '+owned.length+' из '+cards.length+' видов карточек</p>'+(owned.length?'<div class="grid">'+owned.map(c=>cardView(c,user.inventory[c.id])).join("")+'</div>':'<div class="empty">Пока пусто. Открой первый кейс, чтобы получить карточку.</div>')}
+if(page==="workshop"){renderWorkshop();return}
 if(page==="craft"){renderCraft();return}
 if(page==="upgrade"){renderUpgrade();return}
 if(page==="quests"){app.innerHTML='<div class="eyebrow">REWARDS</div><h1>Задания</h1><p>Получай бесплатные VC за достижения и активность.</p>'+quests.map(q=>{const val=user[q.field]||0,done=user.claimed?.[q.id];return '<div class="quest"><div><strong>'+escape(q.name)+'</strong><span class="muted">'+Math.min(val,q.target)+' / '+q.target+' · +'+q.reward+' VC</span></div><button class="'+(done?'secondary':'primary')+' claim" data-id="'+q.id+'" '+(done||val<q.target?'disabled':'')+'>'+(done?'Получено':val>=q.target?'Забрать':'В процессе')+'</button></div>'}).join("")}
@@ -150,6 +160,11 @@ function editShowcase(){
  const owned=cards.filter(c=>user.inventory?.[c.id]);const chosen=new Set(user.showcase||[]);
  show('<h2>Витрина коллекции</h2><p>Выбери не больше 5 карточек. В текущей версии витрина хранится в этом браузере.</p><div class="showcase-picker">'+owned.map(c=>'<label><input type="checkbox" data-showcase="'+c.id+'" '+(chosen.has(c.id)?"checked":"")+'><span>'+c.emoji+' '+escape(c.name)+'</span></label>').join("")+'</div><button class="primary" id="saveShowcase">Сохранить</button>');
  $("#saveShowcase").onclick=()=>lock(async()=>{const ids=[...document.querySelectorAll("[data-showcase]:checked")].map(x=>x.dataset.showcase);const r=await call("saveShowcase",{ids});user.showcase=r.showcase;close();render();toast("Витрина сохранена")})
+}
+function renderWorkshop(){
+ app.innerHTML='<div class="eyebrow">CUSTOM CARD STUDIO · DEMO</div><h1>Мастерская уникальных карточек</h1><p>Создай карточку со своим названием и значком за 2 500 VC. Она уникальна для этого локального профиля. Пока не передаётся другим игрокам и не появляется в их коллекциях.</p><form id="customForm" class="form"><label>Название<input name="name" maxlength="28" minlength="3" required placeholder="Например: Звезда TL"></label><label>Значок<input name="emoji" maxlength="8" required value="💠"></label><button class="primary" type="submit">Создать за 2 500 VC</button></form><h2>Созданные карточки</h2><div class="grid">'+(user.customCards||[]).map(c=>cardView(c,user.inventory[c.id]||0)).join('')+'</div><h2>Обмены между игроками</h2><p>Онлайн-обмен пока недоступен: для безопасной передачи нужны серверные транзакции и проверка владения предметами. Локальные карточки передавать нельзя.</p>';
+ $("#customForm").onsubmit=e=>{e.preventDefault();const data=new FormData(e.target);lock(async()=>{const r=await call("createCustomCard",{name:data.get("name"),emoji:data.get("emoji")});user.balance=r.balance;user.inventory=r.inventory;user.collected=r.collected;user.customCards=[...(user.customCards||[]),r.card];cards.push(r.card);renderWorkshop();toast("Карточка создана!")})};
+ document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id));
 }
 function renderCraft(){
  const pending=user.pendingCraft;
