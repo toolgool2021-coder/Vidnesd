@@ -31,6 +31,11 @@ const EXTRA_CARDS=[
 ];
 EXTRA_CARDS.push(...[["Frost Wolf","🐺"],["Sun Compass","🧭"],["Ancient Rune","🪬"],["Glowing Mushroom","🍄"],["Obsidian Golem","🗿"],["Electric Fox","🦊"],["Cloud Serpent","🐍"],["Ruby Shard","♦️"],["Silver Crown","👑"],["Ocean Compass","🧭"],["Star Clock","🕰️"],["Golden Leaf","🍁"],["Shadow Owl","🦉"],["Arcane Orb","🔮"],["Neon Butterfly","🦋"],["Comet Trail","☄️"],["Forest Spirit","🌲"],["Pixel Crown","👑"],["Night Bloom","🌹"],["Moon Crystal","💠"],["Dragon Scale","🐲"],["Void Lantern","🏮"],["Sun Totem","🗿"],["Glacier Heart","🩵"],["Astral Fox","🦊"],["Royal Falcon","🦅"],["Time Relic","⏳"],["Storm Pearl","🦪"],["Nova Ring","💍"],["Dream Feather","🪶"],["Eclipse Mask","🎭"],["Infinity Core","♾️"]]);
 DEMO_CARDS.push(...EXTRA_CARDS.map(([name,emoji],i)=>({id:"card"+(32+i),name,emoji,rarity:DEMO_RARITIES[i%4],value:DEMO_VALUES[DEMO_RARITIES[i%4]]})));
+const MORE_CARDS=[["Amber Moth","🦋"],["Quantum Seed","🌱"],["Pearl Dragon","🐲"],["Iron Meteor","☄️"],["Velvet Rose","🌹"],["Frost Crown","👑"],["Coral Fox","🦊"],["Copper Golem","🗿"],["Sapphire Tide","🌊"],["Silent Bell","🔔"],["Solar Kite","🪁"],["Crimson Raven","🐦‍⬛"],["Arctic Rune","❄️"],["Phantom Key","🗝️"],["Neon Tiger","🐯"],["Jade Lantern","🏮"],["Twilight Deer","🦌"],["Royal Meteor","🌠"],["Circuit Dragon","🐉"],["Crystal Bloom","🌷"],["Stellar Whale","🐋"],["Pixel Knight","🛡️"],["Lunar Falcon","🦅"],["Obsidian Crown","👑"],["Storm Lotus","🪷"],["Gold Comet","☄️"],["Nebula Eye","👁️"],["Forest Crown","🍀"],["Ruby Moon","🌙"],["Solar Golem","🗿"],["Echo Shell","🐚"],["Mystic Map","🗺️"],["Azure Flame","🔥"],["Clockwork Owl","🦉"],["Silver Lotus","🪷"],["Ember Wolf","🐺"],["Prism Dragon","🐲"],["Ghost Lantern","🏮"],["Jungle Orb","🔮"],["Diamond Compass","🧭"],["Frozen Fox","🦊"],["Ancient Crown","👑"],["Moonlit Pearl","🦪"],["Sky Serpent","🐍"],["Copper Star","⭐"],["Shadow Relic","🪬"],["Golden Butterfly","🦋"],["Nova Feather","🪶"],["Sunken Mask","🎭"],["Aurora Shard","💎"],["Astral Ring","💍"],["Pixel Phoenix","🐦"],["Ocean Crown","👑"],["Void Crystal","🔷"],["Dragon Pearl","🐉"],["Night Compass","🧭"],["Crystal Falcon","🦅"],["Cosmic Rose","🌹"],["Solar Pearl","🦪"],["Dream Totem","🗿"],["Storm Crystal","💠"],["Golden Raven","🐦‍⬛"],["Eternal Rune","🪬"],["Final Star","🌟"]];
+DEMO_CARDS.push(...MORE_CARDS.map(([name,emoji],i)=>({id:"card"+(96+i),name,emoji,rarity:DEMO_RARITIES[i%4],value:0})));
+// Each card has an individual value within its rarity, not a fixed tier price.
+const VALUE_BANDS={common:[12,75],rare:[85,260],epic:[290,990],legendary:[1050,3900]};
+for(let i=0;i<DEMO_CARDS.length;i++){const c=DEMO_CARDS[i],band=VALUE_BANDS[c.rarity],range=band[1]-band[0]+1;c.value=band[0]+((i*97+i*i*13+41)%range)}
 const DEMO_WEIGHTS=[[75,20,4.5,.5],[65,26,8,1],[53,32,13,2],[42,35,19,4]];
 const DEMO_QUESTS=[{id:"open3",name:"Открой 3 кейса",target:3,reward:180,field:"opens"},{id:"open10",name:"Открой 10 кейсов",target:10,reward:350,field:"opens"},{id:"collect5",name:"Собери 5 карточек",target:5,reward:250,field:"collected"},{id:"level5",name:"Набери 500 XP",target:500,reward:500,field:"xp"}];
 const demoKey=()=> "vidnesd_demo_v1_"+current.uid;
@@ -153,7 +158,7 @@ function openingTile(c){return '<div class="draw-tile rarity-'+c.rarity+'"><span
 async function playOpening(area,style,win,duration){
  const pick=()=>cards[randomInt(cards.length)],pause=t=>new Promise(resolve=>setTimeout(resolve,t));
  if(style==="roulette"||style==="carousel"||style==="vertical"||style==="slots"){
-  const vertical=style==="vertical",slots=style==="slots",count=slots?42:style==="carousel"?44:duration>11000?84:duration>9000?68:54,idx=count-7;
+  const vertical=style==="vertical",slots=style==="slots",count=slots?42:style==="carousel"?44:duration>11000?84:duration>9000?68:54,idx=count-(4+randomInt(9));
   const pool=Array.from({length:count},(_,i)=>i===idx?win:pick());
   const layout=vertical?"draw-vertical":slots?"draw-slots":"draw-horizontal";
   area.innerHTML='<div class="draw-window '+layout+' '+(style==="carousel"?"draw-perspective":"")+'"><div class="draw-track">'+pool.map(openingTile).join("")+'</div><div class="draw-marker"></div></div>';
@@ -186,7 +191,7 @@ async function playOpening(area,style,win,duration){
   return;
  }
  if(style==="shuffle"){
-  const pool=Array.from({length:8},(_,i)=>i===5?win:pick()),target=5;
+  const target=randomInt(8),pool=Array.from({length:8},(_,i)=>i===target?win:pick());
   area.innerHTML='<div class="draw-shuffle">'+pool.map((c,i)=>'<div class="draw-shuffle-card" data-pos="'+i+'"><div class="draw-back">✦</div><div class="draw-front">'+openingTile(c)+'</div></div>').join("")+'</div>';
   const elements=[...area.querySelectorAll(".draw-shuffle-card")];
   const steps=Math.max(12,Math.round(duration/340));
@@ -206,7 +211,7 @@ async function playOpening(area,style,win,duration){
   await pause(duration+100);return;
  }
  if(style==="duel"){
-  const n=duration>11000?66:duration>9000?54:44,idx=n-5;
+  const n=duration>11000?66:duration>9000?54:44,idx=n-(3+randomInt(9));
   const rows=[0,1].map(row=>Array.from({length:n},(_,i)=>i===idx?(row===0?win:pick()):pick()));
   area.innerHTML='<div class="draw-duel">'+rows.map((items,row)=>'<div class="draw-duel-window"><div class="draw-duel-track">'+items.map(openingTile).join("")+'</div><div class="draw-duel-marker"></div></div>').join("")+'</div>';
   const windows=[...area.querySelectorAll(".draw-duel-window")];
