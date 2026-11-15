@@ -19,6 +19,22 @@ const EXTRA_CASES=[
 EXTRA_CASES.push(...[["Void Signal","📡",340,0],["Paper Kingdom","📜",390,0],["Pixel Garden","🌱",470,1],["Arctic Pulse","🧊",580,1],["Circuit Lab","🧪",720,1],["Ancient Temple","🏛️",880,2],["Lunar Station","🛸",980,2],["Shadow Realm","🌘",1150,2],["Obsidian","🖤",1400,2],["Prismatic","🔷",1600,3],["Sunken City","🏝️",1850,3],["Golden Orbit","🪙",2200,3],["Celestial Gate","🚪",2500,3],["Eternal Bloom","🌺",2750,3],["Singularity","🌀",3100,3],["Final Horizon","🌄",3500,3]]);
 EXTRA_CASES.push(...[["Forest Echo","🍃",420,1],["Circuit Breaker","🔌",680,1],["Lava Core","🌋",1100,2],["Crystal Cave","🪨",1350,2],["Retro Waves","📼",300,0],["Star Harbor","⚓",790,1],["Night Bazaar","🏮",1700,3],["Cloud Citadel","☁️",2100,3],["Fossil Lab","🦕",380,0],["Skyfall","🌠",2450,3],["Arcane Library","📚",970,2],["Nebula Forge","⚒️",2900,3],["Deep Jungle","🦜",540,1],["Amber Vault","🟠",1500,2],["Electric Dream","💡",760,1],["Dream Portal","🚪",3300,3]]);
 DEMO_CASES.push(...EXTRA_CASES.map(([name,emoji,price,tier],i)=>({id:"case"+(16+i),name,emoji,price,tier})));
+// Special cases: rarity restrictions and value bands are part of the actual drop pool.
+const SPECIAL_CASES=[
+ ["Rare Only","🔵",380,[0,100,0,0],85,260],
+ ["Epic Vault","🟣",1250,[0,0,100,0],290,990],
+ ["Legendary Vault","👑",3600,[0,0,0,100],1050,3900],
+ ["High Roller","🎲",850,[70,0,0,30],12,3900],
+ ["Budget Box","📦",90,[100,0,0,0],12,40],
+ ["Premium Rare","💠",650,[0,100,0,0],160,260],
+ ["Epic or Legend","🌌",2200,[0,0,75,25],290,3900],
+ ["All or Nothing","⚡",1300,[85,0,0,15],12,3900],
+ ["Golden Legends","🏆",4200,[0,0,0,100],2400,3900],
+ ["Crystal Mix","🔮",980,[0,35,55,10],85,3900],
+ ["Lucky Discovery","🍀",500,[30,40,25,5],12,3900],
+ ["Collector Elite","🪐",1900,[0,0,90,10],600,3900]
+];
+DEMO_CASES.push(...SPECIAL_CASES.map(([name,emoji,price,odds,minValue,maxValue],i)=>({id:"case"+(64+i),name,emoji,price,tier:0,odds,minValue,maxValue,special:true})));
 const DEMO_EMOJI=["🌙","☄️","🦊","🦋","🪐","🐉","🦄","🌸","🌊","⚡","💎","🔮","🧿","🦉","🐺","🦁","🌌","🔥","🍀","🌈","🦅","🐈","🪷","🧊","🌠","🎭","🪼","🦈","🌻","🎐","🧬","🛰️"];
 const DEMO_NAMES=["Moonlight","Comet","Fox Spirit","Nebula Wing","Saturn","Ancient Dragon","Unicorn","Sakura","Tidal","Thunder","Crystal","Oracle","Eye of Cosmos","Night Owl","Silver Wolf","Solar Lion","Galaxy","Phoenix","Lucky Clover","Prism","Sky Hunter","Starlit Cat","Lotus","Glacier","Starfall","Phantom","Deep Sea","Ocean King","Sunflower","Wind Chime","Genesis","Voyager"];
 const DEMO_RARITIES=["common","rare","epic","legendary"],DEMO_VALUES={common:25,rare:90,epic:350,legendary:1300};
@@ -37,6 +53,9 @@ DEMO_CARDS.push(...MORE_CARDS.map(([name,emoji],i)=>({id:"card"+(96+i),name,emoj
 const VALUE_BANDS={common:[12,75],rare:[85,260],epic:[290,990],legendary:[1050,3900]};
 for(let i=0;i<DEMO_CARDS.length;i++){const c=DEMO_CARDS[i],band=VALUE_BANDS[c.rarity],range=band[1]-band[0]+1;c.value=band[0]+((i*97+i*i*13+41)%range)}
 const DEMO_WEIGHTS=[[75,20,4.5,.5],[65,26,8,1],[53,32,13,2],[42,35,19,4]];
+function caseOdds(c){return c.odds||DEMO_WEIGHTS[c.tier]}
+function casePool(c,rarity){return DEMO_CARDS.filter(card=>card.rarity===rarity&&(!c.special||(card.value>=c.minValue&&card.value<=c.maxValue)))}
+function caseAvailable(c){return DEMO_RARITIES.flatMap((rarity,i)=>caseOdds(c)[i]>0?casePool(c,rarity):[])}
 const DEMO_QUESTS=[{id:"open3",name:"Открой 3 кейса",target:3,reward:180,field:"opens"},{id:"open10",name:"Открой 10 кейсов",target:10,reward:350,field:"opens"},{id:"collect5",name:"Собери 5 карточек",target:5,reward:250,field:"collected"},{id:"level5",name:"Набери 500 XP",target:500,reward:500,field:"xp"}];
 const demoKey=()=> "vidnesd_demo_v1_"+current.uid;
 const randomInt=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return Math.floor(a[0]/4294967296*n)};
@@ -90,9 +109,9 @@ async function call(name,data={}){
   const cs=DEMO_CASES.find(x=>x.id===data.caseId);if(!cs)throw Error("Кейс не найден");
   if(u.operations[data.operationId])return u.operations[data.operationId];
   if(u.balance<cs.price)throw Error("Недостаточно VC");
-  const roll=randomInt(1000000)/10000,w=DEMO_WEIGHTS[cs.tier];let rarity=0,total=0;
+  const roll=randomInt(1000000)/10000,w=caseOdds(cs);let rarity=0,total=0;
   for(let i=0;i<w.length;i++){total+=w[i];if(roll<total){rarity=i;break}}
-  const pool=DEMO_CARDS.filter(x=>x.rarity===DEMO_RARITIES[rarity]);const card=pool[randomInt(pool.length)];
+  const pool=casePool(cs,DEMO_RARITIES[rarity]);if(!pool.length)throw Error("Для этой редкости нет карточек");const card=pool[randomInt(pool.length)];
   u.balance-=cs.price;u.xp+=20;u.opens++;u.inventory[card.id]=(u.inventory[card.id]||0)+1;u.collected=Object.keys(u.inventory).length;
   const result={card,caseId:cs.id,balance:u.balance,xp:u.xp,opens:u.opens,inventory:u.inventory};
   u.operations[data.operationId]=result;
@@ -109,7 +128,7 @@ function close(){modal.classList.add("hidden");body.innerHTML=""}
 $("#authBtn").onclick=()=>{if(current){if(!auth)return toast("Авторизация ещё загружается");lock(async()=>{await signOut(auth);current=null;user=null;page="home";close();render();toast("Вы вышли из аккаунта")})}else if(auth)authModal();else toast("Подключение к Firebase ещё не завершено")};
 $("#closeModal").onclick=close;modal.addEventListener("click",e=>{if(e.target===modal)close()});
 const cardView=(c,count=0)=>'<div class="tile rarity-'+c.rarity+'"><div class="cardart"><span>'+c.emoji+'</span></div><div class="tag">'+c.rarity+'</div><b>'+escape(c.name)+'</b><p>'+fmt(c.value)+' VC'+(count?' · ×'+count:'')+'</p>'+(count?'<button class="secondary sell" data-id="'+c.id+'">Продать одну</button>':'')+'</div>';
-function caseView(c){return '<div class="case"><div class="case-art">'+c.emoji+'</div><div class="tag">Коллекция '+(c.tier+1)+'</div><h3>'+escape(c.name)+'</h3><div class="price">✦ '+fmt(c.price)+' VC</div><button class="primary open" data-id="'+c.id+'">Открыть кейс</button></div>'}
+function caseView(c){return '<div class="case"><div class="case-art">'+c.emoji+'</div><div class="tag">'+(c.special?"Особый кейс":"Коллекция "+(c.tier+1))+'</div><h3>'+escape(c.name)+'</h3><div class="price">✦ '+fmt(c.price)+' VC</div><button class="primary open" data-id="'+c.id+'">Открыть кейс</button></div>'}
 function stats(){return '<div class="stats"><div class="stat"><span class="muted">Баланс</span><b>'+fmt(user?.balance)+' VC</b></div><div class="stat"><span class="muted">Открытий</span><b>'+fmt(user?.opens)+'</b></div><div class="stat"><span class="muted">Опыт</span><b>'+fmt(user?.xp)+' XP</b></div></div>'}
 function render(){document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#balance").textContent=fmt(user?.balance);$("#authBtn").textContent=current?"Выйти":"Войти";
 if(!user){app.innerHTML='<section class="hero"><div><div class="eyebrow">COLLECT · DISCOVER · LEVEL UP</div><h1>Твоя вселенная карточек</h1><p>Собирай уникальные коллекции, открывай бесплатные игровые кейсы, выполняй задания и поднимайся в рейтинге.</p><div class="actions"><button class="primary" id="join">Начать путешествие</button></div></div><div class="hero-art">💠</div></section><h2>Коллекционный мир</h2><div class="grid">'+["🌙","🐉","💎","🪐"].map((e,i)=>cardView({emoji:e,name:["Moonlight","Dragon","Crystal","Saturn"][i],rarity:["common","rare","epic","legendary"][i],value:0}).replace("0 VC","Коллекционная карточка")).join("")+'</div>';$("#join").onclick=()=>current?verifyModal():authModal();return}
@@ -297,12 +316,12 @@ async function playOpening(area,style,win,duration){
  }
 }
 async function openCase(id){
- const c=cases.find(x=>x.id===id);if(!c)return;const w=weights[c.tier];
+ const c=cases.find(x=>x.id===id);if(!c)return;const w=caseOdds(c);
  show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
- $("#preview").onclick=()=>show('<h2>Карточки коллекции</h2><div class="grid">'+cards.map(x=>cardView(x)).join("")+'</div>');
+ $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2><p>Шансы редкостей: '+w.map((v,i)=>v?["Обычная","Редкая","Эпическая","Легендарная"][i]+" "+v+"%":"").filter(Boolean).join(" · ")+'</p><div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
  $("#startRoll").onclick=()=>lock(async()=>{
   if(user.balance<c.price)throw Error("Недостаточно VC");
   const chosenStyle=openingStyle,chosenDuration=openingDuration;
