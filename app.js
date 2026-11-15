@@ -137,10 +137,20 @@ async function playOpening(area,style,win,duration){
   return;
  }
  if(style==="grid"){
-  const cells=Array.from({length:20},(_,i)=>i===17?win:pick()),index=17;
+  const path=[0,1,2,3,4,9,14,19,18,17,16,15,10,5];
+  const winnerStep=randomInt(path.length),winnerIndex=path[winnerStep];
+  const cells=Array.from({length:20},(_,i)=>i===winnerIndex?win:pick());
   area.innerHTML='<div class="draw-grid">'+cells.map((c,i)=>'<div class="draw-grid-cell" data-cell="'+i+'">'+openingTile(c)+'</div>').join("")+'</div>';
-  const tiles=[...area.querySelectorAll(".draw-grid-cell")],ticks=duration>11000?64:duration>9000?52:40;
-  for(let i=0;i<ticks;i++){tiles.forEach(x=>x.classList.remove("active"));const active=i===ticks-1?index:i%tiles.length;tiles[active].classList.add("active");await pause(55+Math.pow(i/ticks,3)*(duration/ticks*3.4))}
+  const tiles=[...area.querySelectorAll(".draw-grid-cell")];
+  const laps=duration>11000?5:duration>9000?4:3;
+  const steps=laps*path.length+winnerStep+1;
+  const weights=Array.from({length:steps},(_,i)=>0.55+2.8*Math.pow(i/Math.max(1,steps-1),3));
+  const sum=weights.reduce((x,y)=>x+y,0);
+  for(let i=0;i<steps;i++){
+   tiles.forEach(x=>x.classList.remove("active"));
+   tiles[path[i%path.length]].classList.add("active");
+   await pause(duration*weights[i]/sum);
+  }
   return;
  }
  if(style==="shuffle"){
@@ -153,11 +163,14 @@ async function playOpening(area,style,win,duration){
   await pause(500);return;
  }
  if(style==="wheel"){
-  const pool=Array.from({length:12},(_,i)=>i===0?win:pick());
-  area.innerHTML='<div class="draw-wheel"><div class="draw-wheel-rotor">'+pool.map((c,i)=>'<div class="draw-wheel-item" style="--angle:'+(i*30)+'deg">'+openingTile(c)+'</div>').join("")+'</div><div class="draw-wheel-pointer">▼</div></div>';
+  const size=12,winnerIndex=randomInt(size);
+  const pool=Array.from({length:size},(_,i)=>i===winnerIndex?win:pick());
+  area.innerHTML='<div class="draw-wheel"><div class="draw-wheel-rotor">'+pool.map((card,i)=>'<div class="draw-wheel-item" style="--angle:'+(i*360/size)+'deg">'+openingTile(card)+'</div>').join("")+'</div><div class="draw-wheel-pointer">▼</div></div>';
   const rotor=area.querySelector(".draw-wheel-rotor");await pause(100);
-  rotor.style.transition='transform '+duration+'ms cubic-bezier(.08,.76,.12,1)';
-  rotor.style.transform='rotate('+(360*5)+'deg)';
+  const revolutions=duration>11000?8:duration>9000?7:6;
+  const finalAngle=revolutions*360-winnerIndex*(360/size);
+  rotor.style.transition='transform '+duration+'ms cubic-bezier(.07,.74,.12,1)';
+  rotor.style.transform='rotate('+finalAngle+'deg)';
   await pause(duration+100);return;
  }
  if(style==="stack"){
