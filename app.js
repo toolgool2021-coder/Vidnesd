@@ -2,7 +2,7 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase
 import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,onAuthStateChanged,reload,getIdTokenResult} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {getFunctions,httpsCallable,connectFunctionsEmulator} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
 import {firebaseConfig} from "./firebase-config.js";
-import {getFirestore,collection,doc,addDoc,getDocs,query,where,updateDoc,serverTimestamp,limit} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import {getFirestore,collection,doc,addDoc,getDocs,getDoc,setDoc,query,where,updateDoc,serverTimestamp,limit} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 const $=s=>document.querySelector(s),app=$("#app"),modal=$("#modal"),body=$("#modalBody");
 let auth=null,functions=null,db=null,current=null,user=null,cases=[],cards=[],quests=[],weights=[],page="home",busy=false;
 const fmt=n=>Number(n||0).toLocaleString("ru-RU");
@@ -73,16 +73,17 @@ async function call(name,data={}){
   if(u.pendingCraft)throw Error("Сначала заверши предыдущий крафт");
   const ids=Array.isArray(data.sourceIds)?data.sourceIds:[];
   if(ids.length!==3||new Set(ids).size!==3)throw Error("Нужны 3 разные карточки");
-  const materials=ids.map(id=>DEMO_CARDS.find(c=>c.id===id));
+  const materials=ids.map(id=>[...DEMO_CARDS,...(u.customCards||[])].find(c=>c.id===id));
   if(materials.some(c=>!c||!u.inventory[c.id]))throw Error("Карточка отсутствует");
   const rarity=materials[0].rarity;
   if(!materials.every(c=>c.rarity===rarity))throw Error("Все материалы должны быть одной редкости");
   const tier=DEMO_RARITIES.indexOf(rarity),value=materials.reduce((n,c)=>n+c.value,0);
   const luck=Math.max(5,Math.min(85,Math.round(18+value/(value+350)*55+tier*4)));
   const pool=DEMO_CARDS.filter(c=>DEMO_RARITIES.indexOf(c.rarity)>=Math.max(0,tier-2)&&DEMO_RARITIES.indexOf(c.rarity)<=Math.min(3,tier+1));
-  const won=pool[randomInt(pool.length)];
+  const legendary=rarity==="legendary";
+  const won=legendary?{id:"unique_"+crypto.randomUUID(),name:"Уникальный артефакт #"+String(Date.now()).slice(-7),emoji:"🌟",rarity:"legendary",value:Math.round(value*1.2),unique:true,creator:current.uid}:pool[randomInt(pool.length)];
   for(const id of ids){u.inventory[id]--;if(!u.inventory[id])delete u.inventory[id]}
-  u.pendingCraft={cardId:won.id,luck,clicks:0,broken:false,materials:ids};
+  u.pendingCraft={cardId:won.id,uniqueCard:legendary?won:null,luck,clicks:0,broken:false,materials:ids};
   u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);
   return {pendingCraft:u.pendingCraft,inventory:u.inventory,collected:u.collected,showcase:u.showcase};
  }
@@ -95,7 +96,7 @@ async function call(name,data={}){
   p.clicks=click;p.broken=broken;
   let card=null,finished=broken||click===3;
   if(finished){
-   if(!broken){card=DEMO_CARDS.find(c=>c.id===p.cardId);u.inventory[card.id]=(u.inventory[card.id]||0)+1}
+   if(!broken){card=p.uniqueCard||DEMO_CARDS.find(c=>c.id===p.cardId);if(p.uniqueCard)u.customCards=[...(u.customCards||[]),card];u.inventory[card.id]=(u.inventory[card.id]||0)+1}
    u.pendingCraft=null;
   }
   u.collected=Object.keys(u.inventory).length;demoWrite(u);
@@ -175,11 +176,7 @@ async function renderTrades(){
   document.querySelectorAll(".trade-answer").forEach(b=>b.onclick=()=>lock(async()=>{await updateDoc(doc(db,"tradeRequests",b.dataset.id),{status:b.dataset.status});toast(b.dataset.status==="accepted"?"Предложение согласовано, предметы ещё не переданы":"Предложение отклонено");renderTrades()}));
  }catch(e){if(page==="trades")$("#tradeList").textContent="Не удалось загрузить заявки: "+e.message}
 }
-function renderWorkshop(){
- app.innerHTML='<div class="eyebrow">CUSTOM CARD STUDIO · DEMO</div><h1>Мастерская уникальных карточек</h1><p>Создай карточку со своим названием и значком за 2 500 VC. Она уникальна для этого локального профиля. Пока не передаётся другим игрокам и не появляется в их коллекциях.</p><form id="customForm" class="form"><label>Название<input name="name" maxlength="28" minlength="3" required placeholder="Например: Звезда TL"></label><label>Значок<input name="emoji" maxlength="8" required value="💠"></label><button class="primary" type="submit">Создать за 2 500 VC</button></form><h2>Созданные карточки</h2><div class="grid">'+(user.customCards||[]).map(c=>cardView(c,user.inventory[c.id]||0)).join('')+'</div><h2>Обмены между игроками</h2><p>Онлайн-обмен пока недоступен: для безопасной передачи нужны серверные транзакции и проверка владения предметами. Локальные карточки передавать нельзя.</p>';
- $("#customForm").onsubmit=e=>{e.preventDefault();const data=new FormData(e.target);lock(async()=>{const r=await call("createCustomCard",{name:data.get("name"),emoji:data.get("emoji")});user.balance=r.balance;user.inventory=r.inventory;user.collected=r.collected;user.customCards=[...(user.customCards||[]),r.card];cards.push(r.card);renderWorkshop();toast("Карточка создана!")})};
- document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id));
-}
+function renderWorkshop(){app.innerHTML='<div class="eyebrow">UNIQUE FORGE</div><h1>Мастерская уникальных предметов</h1><p>Уникальные карточки создаются только при успешном крафте трёх легендарных предметов. Цена результата = сумма материалов × 1,2. Три нажатия и риск поломки сохраняются.</p><button class="primary" id="toCraft">Перейти к крафту</button><h2>Твои уникальные предметы</h2><div class="grid">'+(user.customCards||[]).filter(c=>c.unique).map(c=>cardView(c,user.inventory[c.id]||0)).join("")+'</div>';$("#toCraft").onclick=()=>{page="craft";render()};document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id))}
 function renderCraft(){
  const pending=user.pendingCraft;
  const owned=cards.filter(c=>(user.inventory?.[c.id]||0)>0);
@@ -195,11 +192,11 @@ function renderCraft(){
   $("#craftTap").onclick=()=>lock(async()=>{
    $("#craftTap").disabled=true;
    const r=await call("craftTap");user.pendingCraft=r.pendingCraft;user.inventory=r.inventory;user.collected=r.collected;
-   if(r.finished){renderCraft();show('<div class="upgrade-success"><div class="upgrade-big">'+(r.broken?'💥':r.card.emoji)+'</div><h2>'+(r.broken?'Крафт разрушен':'Крафт завершён!')+'</h2><p>'+(r.broken?'Материалы потеряны.':escape(r.card.name)+' · '+fmt(r.card.value)+' VC')+'</p><button class="primary" id="craftClose">Продолжить</button></div>');$("#craftClose").onclick=close;if(!r.broken)confetti()}
+   if(r.finished){if(r.card?.unique)cards.push(r.card);renderCraft();show('<div class="upgrade-success"><div class="upgrade-big">'+(r.broken?'💥':r.card.emoji)+'</div><h2>'+(r.broken?'Крафт разрушен':'Крафт завершён!')+'</h2><p>'+(r.broken?'Материалы потеряны.':escape(r.card.name)+' · '+fmt(r.card.value)+' VC')+'</p><button class="primary" id="craftClose">Продолжить</button></div>');$("#craftClose").onclick=close;if(!r.broken)confetti()}
    else {renderCraft();toast("Удар "+r.click+"/3 выдержан. Следующий риск выше")}
   });return;
  }
- app.innerHTML='<div class="eyebrow">CARD FORGE · LUCK</div><h1>Крафт карточек</h1><p>Выбери 3 разные карточки одной редкости. Результат случайный, иногда дешевле материалов. После запуска нажми на центральный предмет 3 раза: риск разрушения растёт с каждым нажатием.</p><div class="upgrade-layout"><div class="upgrade-panel"><h3>Материалы · '+selected.length+'/3</h3><div class="upgrade-slots">'+Array.from({length:3},(_,i)=>{const c=cards.find(x=>x.id===selected[i]);return '<button class="upgrade-slot" data-craft-remove="'+i+'">'+(c?'<span>'+c.emoji+'</span><small>'+escape(c.name)+'</small>':'<span>＋</span><small>Слот '+(i+1)+'</small>')+'</button>'}).join('')+'</div><p>Стоимость: <b>'+fmt(total)+' VC</b></p></div><div class="upgrade-center"><div class="upgrade-ring" style="--progress:'+luck+'%"><div><strong>'+(valid?luck+'%':'—')+'</strong><small>Удача</small></div></div><p>'+(valid?'Возможны потери и случайная награда':'Выбери три карточки одинаковой редкости')+'</p><button class="primary" id="craftNow" '+(!valid?'disabled':'')+'>✦ Начать крафт</button></div><div class="upgrade-panel"><h3>Случайный результат</h3><div class="upgrade-target"><div class="upgrade-big">❔</div><b>Неизвестная карточка</b><span class="tag">RANDOM DROP</span><strong>Не гарантирован</strong></div></div></div><h2>Твой инвентарь</h2><p>Доступные карточки подсвечиваются. Нажми, чтобы выбрать материал.</p><div class="upgrade-inventory">'+(owned.length?owned.map(c=>{const allowed=!tier||c.rarity===tier;const chosen=selected.includes(c.id);return '<button class="upgrade-inv-card '+(chosen?'craft-picked ':allowed?'craft-allowed ':'craft-locked ')+'" data-craft-add="'+c.id+'" '+(!allowed||chosen||selected.length>=3?'disabled':'')+'><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC · ×'+user.inventory[c.id]+'</small></button>'}).join(''):'<div class="empty">Для крафта сначала собери 3 карточки.</div>')+'</div>';
+ app.innerHTML='<div class="eyebrow">CARD FORGE · LUCK</div><h1>Крафт карточек</h1><p>Выбери 3 разные карточки одной редкости. Три легендарные создают уникальный предмет за 120% стоимости материалов при успешном крафте. Остальные дают случайный результат, иногда дешевле материалов. После запуска нажми на центральный предмет 3 раза: риск разрушения растёт с каждым нажатием.</p><div class="upgrade-layout"><div class="upgrade-panel"><h3>Материалы · '+selected.length+'/3</h3><div class="upgrade-slots">'+Array.from({length:3},(_,i)=>{const c=cards.find(x=>x.id===selected[i]);return '<button class="upgrade-slot" data-craft-remove="'+i+'">'+(c?'<span>'+c.emoji+'</span><small>'+escape(c.name)+'</small>':'<span>＋</span><small>Слот '+(i+1)+'</small>')+'</button>'}).join('')+'</div><p>Стоимость: <b>'+fmt(total)+' VC</b></p></div><div class="upgrade-center"><div class="upgrade-ring" style="--progress:'+luck+'%"><div><strong>'+(valid?luck+'%':'—')+'</strong><small>Удача</small></div></div><p>'+(valid?'Возможны потери и случайная награда':'Выбери три карточки одинаковой редкости')+'</p><button class="primary" id="craftNow" '+(!valid?'disabled':'')+'>✦ Начать крафт</button></div><div class="upgrade-panel"><h3>Случайный результат</h3><div class="upgrade-target"><div class="upgrade-big">❔</div><b>Неизвестная карточка</b><span class="tag">RANDOM DROP</span><strong>Не гарантирован</strong></div></div></div><h2>Твой инвентарь</h2><p>Доступные карточки подсвечиваются. Нажми, чтобы выбрать материал.</p><div class="upgrade-inventory">'+(owned.length?owned.map(c=>{const allowed=!tier||c.rarity===tier;const chosen=selected.includes(c.id);return '<button class="upgrade-inv-card '+(chosen?'craft-picked ':allowed?'craft-allowed ':'craft-locked ')+'" data-craft-add="'+c.id+'" '+(!allowed||chosen||selected.length>=3?'disabled':'')+'><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC · ×'+user.inventory[c.id]+'</small></button>'}).join(''):'<div class="empty">Для крафта сначала собери 3 карточки.</div>')+'</div>';
  document.querySelectorAll("[data-craft-add]").forEach(b=>b.onclick=()=>{craftSelected.push(b.dataset.craftAdd);renderCraft()});
  document.querySelectorAll("[data-craft-remove]").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.craftRemove);if(i<craftSelected.length){craftSelected.splice(i,1);renderCraft()}});
  $("#craftNow").onclick=()=>{if(!valid)return;show('<h2>Запустить крафт?</h2><p>Три карточки будут потрачены сразу. Итог случайный, возможна поломка.</p><button class="primary" id="confirmCraft">Начать испытание</button>');$("#confirmCraft").onclick=()=>lock(async()=>{const r=await call("craftCard",{sourceIds:[...craftSelected]});user.pendingCraft=r.pendingCraft;user.inventory=r.inventory;user.collected=r.collected;user.showcase=r.showcase;craftSelected=[];close();renderCraft()})};
