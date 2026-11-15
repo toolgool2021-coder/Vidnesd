@@ -93,7 +93,7 @@ async function loadLeaders(){return;try{const r=await call("leaderboard");const 
 function confetti(){if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let openingStyle="roulette",upgradeSelected=[],upgradeTarget="";
-const OPEN_STYLES=[["roulette","🎰 Лента"],["vertical","⬇️ Вертикальная"],["slots","🎰 Барабан"],["grid","🔳 Сетка"],["shuffle","🃏 Перемешивание"],["wheel","🎡 Колесо"],["carousel","🌀 Карусель"],["stack","📚 Стопка"]];
+const OPEN_STYLES=[["roulette","🎰 Лента"],["vertical","⬇️ Вертикальная"],["slots","🎰 Барабан"],["grid","🔳 Сетка"],["shuffle","🃏 Перемешивание"],["wheel","🎡 Колесо"],["carousel","🌀 Карусель"],["stack","📚 Стопка"],["duel","⚔️ Две ленты"],["spotlight","🔦 Прожектор"],["spiral","🌀 Спираль"],["cascade","🌊 Каскад"]];
 let openingDuration="normal";
 const OPEN_DURATIONS=[["normal","Обычная"],["long","Длинная"],["epic","Кинематографичная"]];
 
@@ -181,6 +181,37 @@ async function playOpening(area,style,win,duration){
   rotor.style.transition='transform '+duration+'ms cubic-bezier(.07,.74,.12,1)';
   rotor.style.transform='rotate('+finalAngle+'deg)';
   await pause(duration+100);return;
+ }
+ if(style==="duel"){
+  const n=duration>11000?66:duration>9000?54:44,idx=n-5;
+  const rows=[0,1].map(row=>Array.from({length:n},(_,i)=>i===idx?(row===0?win:pick()):pick()));
+  area.innerHTML='<div class="draw-duel">'+rows.map((items,row)=>'<div class="draw-duel-window"><div class="draw-duel-track">'+items.map(openingTile).join("")+'</div><div class="draw-duel-marker"></div></div>').join("")+'</div>';
+  const windows=[...area.querySelectorAll(".draw-duel-window")];
+  await pause(90);
+  windows.forEach((w,row)=>{const t=w.querySelector(".draw-duel-track"),item=t.querySelector(".draw-tile"),step=item.offsetWidth+8,offset=idx*step+item.offsetWidth/2-w.clientWidth/2;t.style.transition='transform '+(duration-(row===0?0:700))+'ms cubic-bezier(.06,.75,.12,1)';t.style.transform='translateX(-'+offset+'px)'});
+  await pause(duration+120);return;
+ }
+ if(style==="spotlight"){
+  const target=randomInt(12),items=Array.from({length:12},(_,i)=>i===target?win:pick());
+  area.innerHTML='<div class="draw-spotlight">'+items.map((c,i)=>'<div class="draw-spotlight-item" data-spot="'+i+'">'+openingTile(c)+'</div>').join("")+'</div>';
+  const els=[...area.querySelectorAll(".draw-spotlight-item")],loops=duration>11000?5:duration>9000?4:3;
+  const steps=loops*12+target+1,weights=Array.from({length:steps},(_,i)=>.4+2.7*Math.pow(i/steps,3)),sum=weights.reduce((a,b)=>a+b,0);
+  for(let i=0;i<steps;i++){els.forEach(e=>e.classList.remove("lit"));els[i%12].classList.add("lit");await pause(duration*weights[i]/sum)}
+  return;
+ }
+ if(style==="spiral"){
+  const count=duration>11000?35:duration>9000?29:23,items=Array.from({length:count},(_,i)=>i===count-1?win:pick());
+  area.innerHTML='<div class="draw-spiral"><div class="draw-spiral-center">✦</div>'+items.map((c,i)=>'<div class="draw-spiral-card" style="--i:'+i+'">'+openingTile(c)+'</div>').join("")+'</div>';
+  const els=[...area.querySelectorAll(".draw-spiral-card")],step=duration/count;
+  for(let i=0;i<els.length;i++){const el=els[i];el.classList.add("spiral-visible");if(i>0)els[i-1].classList.add("spiral-gone");await pause(step)}
+  els.at(-1).classList.add("spiral-winner");await pause(250);return;
+ }
+ if(style==="cascade"){
+  const count=duration>11000?32:duration>9000?26:20,items=Array.from({length:count},(_,i)=>i===count-1?win:pick());
+  area.innerHTML='<div class="draw-cascade"><div class="draw-cascade-lane">'+items.map((c,i)=>'<div class="draw-cascade-card" style="--lane:'+(i%3)+'">'+openingTile(c)+'</div>').join("")+'</div></div>';
+  const els=[...area.querySelectorAll(".draw-cascade-card")],step=duration/count;
+  for(let i=0;i<els.length;i++){els[i].classList.add("cascade-enter");if(i>0)els[i-1].classList.add("cascade-exit");await pause(step)}
+  els.at(-1).classList.add("cascade-winner");await pause(250);return;
  }
  if(style==="stack"){
   const pool=Array.from({length:16},(_,i)=>i===15?win:pick());
