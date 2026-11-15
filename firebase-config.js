@@ -1,6 +1,6 @@
 // Публичная конфигурация Firebase Web App (не сервисный ключ).
 export const firebaseConfig = {
-  apiKey: "AIzaSyA65jCBhqOm8N7D0pdRohED0eF_F_5BDdY",
+  apiKey: "AIzaSyC4VfBgOOta9XDw4ETAGBovef5D6IAatlc",
   authDomain: "casespin-web.firebaseapp.com",
   projectId: "casespin-web",
   storageBucket: "casespin-web.firebasestorage.app",
