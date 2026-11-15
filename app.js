@@ -93,7 +93,7 @@ async function loadLeaders(){return;try{const r=await call("leaderboard");const 
 function confetti(){if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let openingStyle="roulette",upgradeSelected=[],upgradeTarget="";
-const OPEN_STYLES=[["roulette","🎰 Рулетка"],["carousel","🌀 Карусель"],["reveal","🎁 Раскрытие"],["drop","💫 Падение"],["cinematic","✨ Кино"],["portal","🪐 Портал"],["shatter","💎 Кристалл"],["flip","🃏 Переворот"],["orbit","🌠 Орбита"],["scan","🔍 Сканер"],["pulse","💜 Импульс"],["meteor","☄️ Метеор"]];
+const OPEN_STYLES=[["roulette","🎰 Лента"],["vertical","⬇️ Вертикальная"],["slots","🎰 Барабан"],["grid","🔳 Сетка"],["shuffle","🃏 Перемешивание"],["wheel","🎡 Колесо"],["carousel","🌀 Карусель"],["stack","📚 Стопка"]];
 let openingDuration="normal";
 const OPEN_DURATIONS=[["normal","Обычная"],["long","Длинная"],["epic","Кинематографичная"]];
 
@@ -117,9 +117,61 @@ function renderUpgrade(){
  $("#upgradeClose").onclick=close;if(r.success)confetti()
  })
 }
+function openingTile(c){return '<div class="draw-tile rarity-'+c.rarity+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC</small></div>'}
+async function playOpening(area,style,win,duration){
+ const pick=()=>cards[randomInt(cards.length)],pause=t=>new Promise(resolve=>setTimeout(resolve,t));
+ if(style==="roulette"||style==="carousel"||style==="vertical"||style==="slots"){
+  const vertical=style==="vertical",slots=style==="slots",count=slots?42:style==="carousel"?44:duration>11000?84:duration>9000?68:54,idx=count-7;
+  const pool=Array.from({length:count},(_,i)=>i===idx?win:pick());
+  const layout=vertical?"draw-vertical":slots?"draw-slots":"draw-horizontal";
+  area.innerHTML='<div class="draw-window '+layout+' '+(style==="carousel"?"draw-perspective":"")+'"><div class="draw-track">'+pool.map(openingTile).join("")+'</div><div class="draw-marker"></div></div>';
+  const track=area.querySelector(".draw-track"),windowEl=area.querySelector(".draw-window"),tile=track.querySelector(".draw-tile");
+  await pause(100);
+  const gap=parseFloat(getComputedStyle(track).gap)||0;
+  const step=(vertical?tile.offsetHeight:tile.offsetWidth)+gap;
+  const center=(vertical?windowEl.clientHeight:windowEl.clientWidth)/2;
+  const offset=idx*step+(vertical?tile.offsetHeight:tile.offsetWidth)/2-center;
+  track.style.transition='transform '+duration+'ms cubic-bezier(.07,.72,.12,1)';
+  track.style.transform=vertical?'translateY(-'+offset+'px)':'translateX(-'+offset+'px)';
+  await pause(duration+100);
+  return;
+ }
+ if(style==="grid"){
+  const cells=Array.from({length:20},(_,i)=>i===17?win:pick()),index=17;
+  area.innerHTML='<div class="draw-grid">'+cells.map((c,i)=>'<div class="draw-grid-cell" data-cell="'+i+'">'+openingTile(c)+'</div>').join("")+'</div>';
+  const tiles=[...area.querySelectorAll(".draw-grid-cell")],ticks=duration>11000?64:duration>9000?52:40;
+  for(let i=0;i<ticks;i++){tiles.forEach(x=>x.classList.remove("active"));const active=i===ticks-1?index:i%tiles.length;tiles[active].classList.add("active");await pause(55+Math.pow(i/ticks,3)*(duration/ticks*3.4))}
+  return;
+ }
+ if(style==="shuffle"){
+  const pool=Array.from({length:8},(_,i)=>i===5?win:pick()),target=5;
+  area.innerHTML='<div class="draw-shuffle">'+pool.map((c,i)=>'<div class="draw-shuffle-card" data-pos="'+i+'"><div class="draw-back">✦</div><div class="draw-front">'+openingTile(c)+'</div></div>').join("")+'</div>';
+  const elements=[...area.querySelectorAll(".draw-shuffle-card")];
+  const steps=Math.max(12,Math.round(duration/340));
+  for(let i=0;i<steps;i++){const j=randomInt(elements.length);elements.forEach((el,k)=>{el.style.transform='translateY('+(k===j?-18:0)+'px) rotate('+(k===j?8:-2)+'deg)';el.classList.remove("selected")});await pause(duration/steps)}
+  elements.forEach((el,k)=>{el.style.transform="";el.classList.toggle("selected",k===target);if(k===target)el.classList.add("revealed")});
+  await pause(500);return;
+ }
+ if(style==="wheel"){
+  const pool=Array.from({length:12},(_,i)=>i===0?win:pick());
+  area.innerHTML='<div class="draw-wheel"><div class="draw-wheel-rotor">'+pool.map((c,i)=>'<div class="draw-wheel-item" style="--angle:'+(i*30)+'deg">'+openingTile(c)+'</div>').join("")+'</div><div class="draw-wheel-pointer">▼</div></div>';
+  const rotor=area.querySelector(".draw-wheel-rotor");await pause(100);
+  rotor.style.transition='transform '+duration+'ms cubic-bezier(.08,.76,.12,1)';
+  rotor.style.transform='rotate('+(360*5)+'deg)';
+  await pause(duration+100);return;
+ }
+ if(style==="stack"){
+  const pool=Array.from({length:16},(_,i)=>i===15?win:pick());
+  area.innerHTML='<div class="draw-stack">'+pool.map((c,i)=>'<div class="draw-stack-card" style="--depth:'+i+'">'+openingTile(c)+'</div>').join("")+'</div>';
+  const elements=[...area.querySelectorAll(".draw-stack-card")];
+  const tick=duration/elements.length;
+  for(let i=0;i<elements.length-1;i++){elements[i].classList.add("discarded");await pause(tick)}
+  elements.at(-1).classList.add("winner");await pause(tick);
+ }
+}
 async function openCase(id){
  const c=cases.find(x=>x.id===id);if(!c)return;const w=weights[c.tier];
- show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери анимацию</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
+ show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#preview").onclick=()=>show('<h2>Карточки коллекции</h2><div class="grid">'+cards.map(x=>cardView(x)).join("")+'</div>');
@@ -131,23 +183,7 @@ async function openCase(id){
   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
   const area=$("#rollArea");if(!area)return;
   const duration=chosenDuration==="epic"?12500:chosenDuration==="long"?9500:7200;
-  const pick=()=>cards[randomInt(cards.length)];
-  if(chosenStyle==="roulette"||chosenStyle==="carousel"){
-   const count=chosenDuration==="epic"?86:chosenDuration==="long"?68:54,winIndex=count-8;
-   const pool=Array.from({length:count},(_,i)=>i===winIndex?r.card:pick());
-   area.innerHTML='<div class="roulette-window '+(chosenStyle==="carousel"?'carousel-mode':'')+'"><div class="roulette-track">'+pool.map(x=>'<div class="roulette-item rarity-'+x.rarity+'"><div><div class="emoji">'+x.emoji+'</div><small>'+escape(x.name)+'</small></div></div>').join("")+'</div></div>';
-   const track=area.querySelector(".roulette-track"),windowEl=area.querySelector(".roulette-window");
-   await sleep(90);const item=track.querySelector(".roulette-item"),width=item.getBoundingClientRect().width+parseFloat(getComputedStyle(track).gap||"0"),center=windowEl.clientWidth/2;
-   const offset=winIndex*width+item.getBoundingClientRect().width/2-center;
-   track.style.transition='transform '+duration+'ms cubic-bezier(.08,.76,.11,1)';
-   track.style.transform='translateX(-'+offset+'px)';
-   await sleep(duration+150);
-  }else{
-   const icons={reveal:"🎁",drop:"💠",cinematic:"✦",portal:"🪐",shatter:"💎",flip:"🃏",orbit:"🌠",scan:"🔍",pulse:"💜",meteor:"☄️"};
-   const names={reveal:"Раскрытие тайны",drop:"Карточка приближается",cinematic:"Кинематографическое открытие",portal:"Открытие портала",shatter:"Кристалл раскрывается",flip:"Переворот карточки",orbit:"Орбитальное вращение",scan:"Сканирование находки",pulse:"Энергетический импульс",meteor:"Метеоритный след"};
-   area.innerHTML='<div class="opening-stage '+chosenStyle+'" style="--opening-time:'+duration+'ms"><div class="opening-aura"></div><div class="opening-object">'+icons[chosenStyle]+'</div><div class="opening-stage-label">'+names[chosenStyle]+'</div><div class="opening-progress"><span></span></div></div>';
-   await sleep(duration);
-  }
+  await playOpening(area,chosenStyle,r.card,duration);
   if(!document.body.contains(area))return;
   area.innerHTML='<div class="result rarity-'+r.card.rarity+'"><div class="big">'+r.card.emoji+'</div><h2>'+escape(r.card.name)+'</h2><p>'+r.card.rarity.toUpperCase()+' · '+r.card.value+' VC</p><button class="primary" id="again">Ещё раз</button></div>';
   $("#again").onclick=()=>openCase(id);confetti();toast("Карточка добавлена в инвентарь");
