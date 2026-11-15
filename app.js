@@ -164,16 +164,43 @@ function editShowcase(){
  show('<h2>Витрина коллекции</h2><p>Выбери не больше 5 карточек. В текущей версии витрина хранится в этом браузере.</p><div class="showcase-picker">'+owned.map(c=>'<label><input type="checkbox" data-showcase="'+c.id+'" '+(chosen.has(c.id)?"checked":"")+'><span>'+c.emoji+' '+escape(c.name)+'</span></label>').join("")+'</div><button class="primary" id="saveShowcase">Сохранить</button>');
  $("#saveShowcase").onclick=()=>lock(async()=>{const ids=[...document.querySelectorAll("[data-showcase]:checked")].map(x=>x.dataset.showcase);const r=await call("saveShowcase",{ids});user.showcase=r.showcase;close();render();toast("Витрина сохранена")})
 }
+async function publishTradeProfile(){
+ if(!db||!current||!user)return;
+ const nick=String(user.nick||"Collector").slice(0,20);
+ await setDoc(doc(db,"tradeProfiles",current.uid),{uid:current.uid,nick,nickLower:nick.toLowerCase(),updatedAt:serverTimestamp()});
+}
 async function renderTrades(){
- app.innerHTML='<div class="eyebrow">PLAYER EXCHANGE · FIRESTORE</div><h1>Заявки на обмен</h1><p>Отправляй предложения другим игрокам по UID. Это заявки для согласования: карточки и VC пока не передаются автоматически.</p><form class="form" id="tradeForm"><label>UID получателя<input name="recipient" required minlength="20" maxlength="128" placeholder="UID другого игрока"></label><label>Что предлагаешь<input name="offer" required maxlength="120" placeholder="Например: Solar Flare"></label><label>Что хочешь получить<input name="want" required maxlength="120" placeholder="Например: Crystal"></label><button class="primary" type="submit">Отправить заявку</button></form><h2>Входящие и исходящие заявки</h2><div id="tradeList" class="trade-list">Загрузка...</div>';
- $("#tradeForm").onsubmit=e=>{e.preventDefault();lock(async()=>{if(!db)throw Error("Firestore не подключён");const data=new FormData(e.target),recipient=String(data.get("recipient")).trim(),offer=String(data.get("offer")).trim(),want=String(data.get("want")).trim();if(!/^[A-Za-z0-9]{20,128}$/.test(recipient)||recipient===current.uid)throw Error("Укажи UID другого игрока");if(!offer||!want||offer.length>120||want.length>120)throw Error("Укажи предметы до 120 символов");await addDoc(collection(db,"tradeRequests"),{sender:current.uid,recipient,offer,want,status:"pending",createdAt:serverTimestamp()});toast("Заявка отправлена");renderTrades()})};
+ const owned=cards.filter(c=>user.inventory?.[c.id]>0);
+ const options='<option value="">Без карточки</option>'+owned.map(c=>'<option value="'+escape(c.id)+'">'+escape(c.name)+' · '+fmt(c.value)+' VC</option>').join("");
+ app.innerHTML='<div class="eyebrow">PLAYER EXCHANGE · FIRESTORE</div><h1>Обмены между игроками</h1><p>Найди игрока по нику, выбери предмет и валюту, которые отдаёшь и хочешь получить. Можно выбрать «ничего». Пока это только предложения: баланс и карточки автоматически не переводятся.</p><p>Твой ник для поиска: <b>'+escape(user.nick)+'</b> · <button class="secondary" id="publishTrade">Показать меня в поиске</button></p><form class="form" id="tradeForm"><label>Поиск игрока по нику<input id="tradeSearch" placeholder="Введите точный ник" maxlength="20" required></label><button class="secondary" id="findTrader" type="button">Найти игрока</button><div id="foundTrader" class="muted">Выбери получателя</div><input id="tradeRecipient" type="hidden" required><h3>Ты отдаёшь</h3><label>Карточка<select name="offerCard">'+options+'</select></label><label>VC (0 = без валюты)<input name="offerVC" type="number" min="0" max="100000000" value="0" required></label><h3>Ты получаешь</h3><label>Желаемая карточка<select name="wantCard"><option value="">Без карточки</option>'+DEMO_CARDS.map(c=>'<option value="'+escape(c.id)+'">'+escape(c.name)+' · '+fmt(c.value)+' VC</option>').join("")+'</select></label><label>VC (0 = без валюты)<input name="wantVC" type="number" min="0" max="100000000" value="0" required></label><button class="primary" type="submit">Отправить предложение</button></form><h2>Предложения</h2><div id="tradeList">Загрузка...</div>';
+ $("#publishTrade").onclick=()=>lock(async()=>{await publishTradeProfile();toast("Твой ник теперь доступен для поиска")});
+ $("#findTrader").onclick=()=>lock(async()=>{
+  const nick=$("#tradeSearch").value.trim().toLowerCase();if(!nick)throw Error("Введи ник");
+  const result=await getDocs(query(collection(db,"tradeProfiles"),where("nickLower","==",nick),limit(10)));
+  const players=result.docs.filter(d=>d.id!==current.uid);
+  $("#foundTrader").innerHTML=players.length?players.map(d=>'<button type="button" class="secondary chooseTrader" data-uid="'+escape(d.id)+'">'+escape(d.data().nick)+' · '+escape(d.id.slice(0,6))+'…</button>').join(" "):"Игрок не найден. Он должен открыть «Обмены» и включить поиск по нику.";
+  document.querySelectorAll(".chooseTrader").forEach(b=>b.onclick=()=>{$("#tradeRecipient").value=b.dataset.uid;$("#foundTrader").textContent="Получатель выбран: "+b.textContent});
+ });
+ $("#tradeForm").onsubmit=e=>{e.preventDefault();lock(async()=>{
+  const data=new FormData(e.target),recipient=$("#tradeRecipient").value;
+  if(!/^[A-Za-z0-9]{20,128}$/.test(recipient)||recipient===current.uid)throw Error("Сначала найди и выбери игрока");
+  const offerCard=String(data.get("offerCard")||""),wantCard=String(data.get("wantCard")||"");
+  const offerVC=Number(data.get("offerVC")),wantVC=Number(data.get("wantVC"));
+  if(!Number.isSafeInteger(offerVC)||!Number.isSafeInteger(wantVC)||offerVC<0||wantVC<0||offerVC>100000000||wantVC>100000000)throw Error("Некорректная сумма VC");
+  if(offerCard&&!user.inventory[offerCard])throw Error("У тебя нет этой карточки");
+  if(offerVC>user.balance)throw Error("Недостаточно VC");
+  if(!offerCard&&!wantCard&&!offerVC&&!wantVC)throw Error("Укажи хотя бы один предмет или VC");
+  await addDoc(collection(db,"tradeRequests"),{sender:current.uid,recipient,offerCard,wantCard,offerVC,wantVC,status:"pending",createdAt:serverTimestamp()});
+  toast("Предложение отправлено");renderTrades();
+ })};
  try{
   if(!db)throw Error("Firestore не подключён");
   const [inbox,outbox]=await Promise.all([getDocs(query(collection(db,"tradeRequests"),where("recipient","==",current.uid),limit(50))),getDocs(query(collection(db,"tradeRequests"),where("sender","==",current.uid),limit(50)))]);
   if(page!=="trades")return;
   const all=[...inbox.docs,...outbox.docs].filter((d,i,a)=>a.findIndex(x=>x.id===d.id)===i).sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0));
-  $("#tradeList").innerHTML=all.length?all.map(d=>{const x=d.data(),incoming=x.recipient===current.uid;return '<div class="quest"><div><b>'+(incoming?"Входящая":"Исходящая")+'</b><p>'+escape(x.offer)+' ⇄ '+escape(x.want)+'</p><small>'+escape(incoming?x.sender:x.recipient)+' · '+escape(x.status)+'</small></div>'+(incoming&&x.status==="pending"?'<div class="actions"><button class="secondary trade-answer" data-id="'+d.id+'" data-status="accepted">Согласен</button><button class="secondary trade-answer" data-id="'+d.id+'" data-status="declined">Отклонить</button></div>':'')+'</div>'}).join(''):'Заявок пока нет';
-  document.querySelectorAll(".trade-answer").forEach(b=>b.onclick=()=>lock(async()=>{await updateDoc(doc(db,"tradeRequests",b.dataset.id),{status:b.dataset.status});toast(b.dataset.status==="accepted"?"Предложение согласовано, предметы ещё не переданы":"Предложение отклонено");renderTrades()}));
+  const cardLabel=id=>cards.find(c=>c.id===id)?.name||id||"ничего";
+  $("#tradeList").innerHTML=all.length?all.map(d=>{const x=d.data(),incoming=x.recipient===current.uid,offer=x.offerCard!==undefined?cardLabel(x.offerCard)+" + "+fmt(x.offerVC)+" VC":x.offer,want=x.wantCard!==undefined?cardLabel(x.wantCard)+" + "+fmt(x.wantVC)+" VC":x.want;return '<div class="quest"><div><b>'+(incoming?"Входящее":"Исходящее")+'</b><p>Отдаёт: '+escape(offer)+' · Получает: '+escape(want)+'</p><small>'+escape(incoming?x.sender:x.recipient)+' · '+escape(x.status)+' · без передачи активов</small></div>'+(incoming&&x.status==="pending"?'<div class="actions"><button class="secondary trade-answer" data-id="'+d.id+'" data-status="accepted">Согласен</button><button class="secondary trade-answer" data-id="'+d.id+'" data-status="declined">Отклонить</button></div>':'')+'</div>'}).join(''):'Заявок пока нет';
+  document.querySelectorAll(".trade-answer").forEach(b=>b.onclick=()=>lock(async()=>{await updateDoc(doc(db,"tradeRequests",b.dataset.id),{status:b.dataset.status});toast("Статус предложения обновлён. Передачи активов нет.");renderTrades()}));
  }catch(e){if(page==="trades")$("#tradeList").textContent="Не удалось загрузить заявки: "+e.message}
 }
 function renderWorkshop(){app.innerHTML='<div class="eyebrow">UNIQUE FORGE</div><h1>Мастерская уникальных предметов</h1><p>Уникальные карточки создаются только при успешном крафте трёх легендарных предметов. Цена результата = сумма материалов × 1,2. Три нажатия и риск поломки сохраняются.</p><button class="primary" id="toCraft">Перейти к крафту</button><h2>Твои уникальные предметы</h2><div class="grid">'+(user.customCards||[]).filter(c=>c.unique).map(c=>cardView(c,user.inventory[c.id]||0)).join("")+'</div>';$("#toCraft").onclick=()=>{page="craft";render()};document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id))}
