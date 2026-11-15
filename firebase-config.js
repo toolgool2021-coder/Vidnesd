@@ -1,10 +1,10 @@
-// Публичная конфигурация Firebase Web App (не сервисный ключ).
+// Public Firebase Web App configuration. Do not put service account credentials here.
 export const firebaseConfig = {
-  apiKey: "AIzaSyC4VfBgOOta9XDw4ETAGBovef5D6IAatlc",
-  authDomain: "casespin-web.firebaseapp.com",
-  projectId: "casespin-web",
-  storageBucket: "casespin-web.firebasestorage.app",
-  messagingSenderId: "250684123639",
-  appId: "1:250684123639:web:87938fbee73567b19be6f2",
-  measurementId: "G-FT8X9G6K28"
+  apiKey: "AIzaSyBSNITtZpYlp-SD8_XEHBomJgPOTwtodp8",
+  authDomain: "vidnesd.firebaseapp.com",
+  projectId: "vidnesd",
+  storageBucket: "vidnesd.firebasestorage.app",
+  messagingSenderId: "778769486384",
+  appId: "1:778769486384:web:9cbfe35c4f4d592f0653f5",
+  measurementId: "G-TB21D854R8"
 };
