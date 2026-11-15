@@ -97,11 +97,16 @@
 .draw-shuffle-card.revealed{transform:rotateY(180deg)!important}.draw-shuffle-card.selected{filter:drop-shadow(0 0 18px #9d86ff)}
 .draw-wheel{position:relative;height:320px;overflow:hidden;display:grid;place-items:center;background:radial-gradient(circle,#25234d,#0b1020 75%);border-radius:16px}
 .draw-wheel-rotor{width:270px;height:270px;border-radius:50%;position:relative;border:3px solid #947bff;box-shadow:0 0 25px #7966ee55}
-.draw-wheel-item{position:absolute;left:calc(50% - 36px);top:calc(50% - 40px);transform:rotate(var(--angle)) translateY(-99px) rotate(calc(-1 * var(--angle)));width:72px;height:80px}
+.draw-wheel-item{position:absolute;left:calc(50% - 36px);top:calc(50% - 40px);transform:rotate(var(--angle)) translateY(-99px);width:72px;height:80px}
 .draw-wheel-item .draw-tile{width:72px;height:80px;gap:2px;padding:2px}.draw-wheel-item .draw-tile span{font-size:28px}.draw-wheel-item .draw-tile b{font-size:8px}.draw-wheel-item .draw-tile small{display:none}
 .draw-wheel-pointer{position:absolute;top:8px;left:calc(50% - 13px);font-size:26px;color:#fff;z-index:3;filter:drop-shadow(0 0 8px #fff)}
 .draw-stack{height:250px;position:relative;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle,#252249,#0c1222);border-radius:16px;margin:18px 0}
 .draw-stack-card{position:absolute;transform:translate(calc(var(--depth)*.5px),calc(var(--depth)*-.4px)) rotate(calc(var(--depth)*.8deg));transition:transform .4s,opacity .4s;z-index:calc(20 - var(--depth))}
 .draw-stack-card.discarded{transform:translateX(440px) rotate(45deg);opacity:0}
 .draw-stack-card.winner{transform:scale(1.15);filter:drop-shadow(0 0 22px #c6aaff)}
-@media(max-width:600px){.draw-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.draw-grid-cell .draw-tile{height:82px}.draw-shuffle{gap:6px}.draw-shuffle-card{height:100px}.draw-tile{width:115px}.draw-wheel{height:300px}}
+@media(max-width:600px){.draw-grid{grid-template-columns:repeat(5,minmax(0,1fr))}.draw-grid-cell .draw-tile{height:82px}.draw-shuffle{gap:6px}.draw-shuffle-card{height:100px}.draw-tile{width:115px}.draw-wheel{height:300px}}
+
+/* Fixed selection readability */
+.draw-wheel-rotor{will-change:transform;transform-origin:50% 50%}
+.draw-wheel-item .draw-tile{box-shadow:0 0 10px #0008}
+.draw-grid-cell.active .draw-tile{border-color:#e5eaff;box-shadow:0 0 18px #a3caff}
