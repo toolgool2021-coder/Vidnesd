@@ -21,6 +21,13 @@ const DEMO_EMOJI=["🌙","☄️","🦊","🦋","🪐","🐉","🦄","🌸","�
 const DEMO_NAMES=["Moonlight","Comet","Fox Spirit","Nebula Wing","Saturn","Ancient Dragon","Unicorn","Sakura","Tidal","Thunder","Crystal","Oracle","Eye of Cosmos","Night Owl","Silver Wolf","Solar Lion","Galaxy","Phoenix","Lucky Clover","Prism","Sky Hunter","Starlit Cat","Lotus","Glacier","Starfall","Phantom","Deep Sea","Ocean King","Sunflower","Wind Chime","Genesis","Voyager"];
 const DEMO_RARITIES=["common","rare","epic","legendary"],DEMO_VALUES={common:25,rare:90,epic:350,legendary:1300};
 const DEMO_CARDS=DEMO_EMOJI.map((emoji,i)=>({id:"card"+i,emoji,name:DEMO_NAMES[i],rarity:DEMO_RARITIES[i%4],value:DEMO_VALUES[DEMO_RARITIES[i%4]]}));
+const EXTRA_CARDS=[
+["Solar Flare","🌞"],["Red Panda","🐼"],["Storm Rider","🌪️"],["Magic Scroll","📜"],["Starlight","⭐"],["Cyber Core","🦾"],["Royal Crown","👑"],["Cosmic Egg","🥚"],
+["Ancient Key","🗝️"],["Snow Spirit","☃️"],["Night Raven","🐦‍⬛"],["Meteorite","☄️"],["Sea Pearl","🦪"],["Neon Blade","🗡️"],["Arcade Ghost","👻"],["Golden Mask","🎭"],
+["Mystic Lantern","🏮"],["Crystal Ball","🔮"],["Forest Guardian","🌳"],["Sky Castle","🏰"],["Phoenix Feather","🪶"],["Black Hole","🕳️"],["Pixel Heart","💟"],["Thunder Cloud","⛈️"],
+["Magic Compass","🧭"],["Deep Coral","🪸"],["Moon Rabbit","🐇"],["Royal Gem","💍"],["Sunset","🌅"],["Galaxy Fox","🦊"],["Dragon Fire","🐲"],["Infinity Star","✨"]
+];
+DEMO_CARDS.push(...EXTRA_CARDS.map(([name,emoji],i)=>({id:"card"+(32+i),name,emoji,rarity:DEMO_RARITIES[i%4],value:DEMO_VALUES[DEMO_RARITIES[i%4]]})));
 const DEMO_WEIGHTS=[[75,20,4.5,.5],[65,26,8,1],[53,32,13,2],[42,35,19,4]];
 const DEMO_QUESTS=[{id:"open3",name:"Открой 3 кейса",target:3,reward:180,field:"opens"},{id:"open10",name:"Открой 10 кейсов",target:10,reward:350,field:"opens"},{id:"collect5",name:"Собери 5 карточек",target:5,reward:250,field:"collected"},{id:"level5",name:"Набери 500 XP",target:500,reward:500,field:"xp"}];
 const demoKey=()=> "vidnesd_demo_v1_"+current.uid;
