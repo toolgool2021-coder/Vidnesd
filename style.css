@@ -40,3 +40,9 @@
 @media(max-width:900px){.upgrade-layout{grid-template-columns:1fr}.upgrade-ring{width:165px;height:165px}.upgrade-slots{grid-template-columns:repeat(5,minmax(0,1fr))}.upgrade-slot{min-height:85px}.upgrade-slot span{font-size:26px}}
 @media(max-width:540px){.upgrade-slots{grid-template-columns:repeat(3,minmax(0,1fr))}.opening-styles{gap:5px}.style-choice{padding:8px;font-size:12px}}
 @media(prefers-reduced-motion:reduce){.opening-object{animation:none!important}}
+
+.upgrade-spin{position:relative;width:220px;height:220px;margin:15px auto 25px;border-radius:50%;background:conic-gradient(#56d6b4 var(--chance),#ff695f 0);border:8px solid #282c46;box-shadow:0 0 35px #8e69ef55;display:grid;place-items:center;transform:rotate(0deg)}
+.upgrade-spin.spinning{transition:transform 3.1s cubic-bezier(.08,.78,.12,1);transform:rotate(var(--end-angle))}
+.upgrade-spin-center{width:155px;height:155px;background:#12182b;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:36px;font-weight:800;color:#fff}
+.upgrade-spin-center small{font-size:12px;color:#a6b1d0}
+.upgrade-pointer{position:absolute;top:-27px;left:calc(50% - 10px);font-size:23px;color:#fff;z-index:2}
