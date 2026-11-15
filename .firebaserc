@@ -1,1 +1,5 @@
-{"projects":{"default":"casespin-web"}}
+{
+  "projects": {
+    "default": "vidnesd"
+  }
+}
