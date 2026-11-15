@@ -1,8 +1,10 @@
-// Вставь значения из Firebase Console > Project settings > Your apps.
-// Это публичная конфигурация; НЕ вставляй service-account JSON или приватные ключи.
+// Публичная конфигурация Firebase Web App (не сервисный ключ).
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
+  apiKey: "AIzaSyA65jCBhq0m8N7D0pdRohED0eF_F_5BDdY",
   authDomain: "casespin-web.firebaseapp.com",
   projectId: "casespin-web",
-  appId: "REPLACE_ME"
+  storageBucket: "casespin-web.firebasestorage.app",
+  messagingSenderId: "250684123639",
+  appId: "1:250684123639:web:87938fbee73567b19be6f2",
+  measurementId: "G-FT8X9G6K28"
 };
