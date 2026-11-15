@@ -45,20 +45,38 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Requests only. No item or currency transfer occurs here.
+    // Public opt-in nickname directory. Only owner of a profile may edit it.
+    match /tradeProfiles/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['uid','nick','nickLower','updatedAt'])
+        && request.resource.data.uid == uid
+        && request.resource.data.nick is string
+        && request.resource.data.nick.size() >= 1
+        && request.resource.data.nick.size() <= 20
+        && request.resource.data.nickLower == request.resource.data.nick.lower()
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if isSelf(uid);
+    }
+
+    // Proposals are not actual asset transfers.
     match /tradeRequests/{tradeId} {
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['sender','recipient','offer','want','status','createdAt'])
+        && request.resource.data.keys().hasOnly(['sender','recipient','offerCard','wantCard','offerVC','wantVC','status','createdAt'])
         && request.resource.data.sender == request.auth.uid
         && request.resource.data.recipient is string
         && request.resource.data.recipient.matches('[A-Za-z0-9]{20,128}')
         && request.resource.data.recipient != request.auth.uid
-        && request.resource.data.offer is string
-        && request.resource.data.offer.size() > 0
-        && request.resource.data.offer.size() <= 120
-        && request.resource.data.want is string
-        && request.resource.data.want.size() > 0
-        && request.resource.data.want.size() <= 120
+        && request.resource.data.offerCard is string
+        && request.resource.data.offerCard.size() <= 100
+        && request.resource.data.wantCard is string
+        && request.resource.data.wantCard.size() <= 100
+        && request.resource.data.offerVC is int
+        && request.resource.data.offerVC >= 0
+        && request.resource.data.offerVC <= 100000000
+        && request.resource.data.wantVC is int
+        && request.resource.data.wantVC >= 0
+        && request.resource.data.wantVC <= 100000000
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt == request.time;
       allow get, list: if signedIn()
