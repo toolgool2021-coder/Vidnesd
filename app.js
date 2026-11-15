@@ -93,8 +93,8 @@ function renderUpgrade(){
  $("#upgradeNow").onclick=()=>lock(async()=>{
  const r=await call("upgradeCard",{sourceIds:upgradeSelected,targetId:target.id});
  user.inventory=r.inventory;user.collected=r.collected;upgradeSelected=[];renderUpgrade();
- show('<div class="upgrade-success"><div class="upgrade-spin" style="--chance:'+r.chance+'%"><div class="upgrade-pointer">▼</div><div class="upgrade-spin-center">'+r.chance+'%<small>Шанс успеха</small></div></div><p>Проверяем результат...</p></div>');
- await sleep(100);const ring=body.querySelector(".upgrade-spin");if(ring){ring.style.setProperty("--end-angle",(1440+r.roll*3.6)+"deg");ring.classList.add("spinning")}
+ show('<div class="upgrade-success"><div class="upgrade-spin" style="--chance:'+r.chance+'%"><div class="upgrade-needle"><div class="upgrade-needle-tip"></div><div class="upgrade-needle-shaft"></div></div><div class="upgrade-spin-center">'+r.chance+'%<small>Шанс успеха</small></div></div><p>Проверяем результат...</p></div>');
+ await sleep(100);const needle=body.querySelector(".upgrade-needle");if(needle){needle.style.setProperty("--end-angle",(1800+r.roll*3.6)+"deg");needle.classList.add("spinning")}
  await sleep(3200);
  show('<div class="upgrade-success"><div class="upgrade-big">'+(r.success?r.card.emoji:"💠")+'</div><h2>'+(r.success?"Улучшение успешно!":"Улучшение не удалось")+'</h2><p>Шанс '+r.chance+'% · Выпало '+r.roll.toFixed(2)+'%</p><p>'+(r.success?escape(r.card.name)+" добавлена в коллекцию":"Материалы использованы")+'</p><button class="primary" id="upgradeClose">Продолжить</button></div>');
  $("#upgradeClose").onclick=close;if(r.success)confetti()
