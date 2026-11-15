@@ -176,3 +176,18 @@
 .craft-materials input,.showcase-picker input{accent-color:#a58bff}
 #craftTarget{width:100%;padding:13px;background:#202741;color:#fff;border:1px solid #4c5276;border-radius:11px}
 @media(max-width:680px){.craft-layout{grid-template-columns:1fr}}
+
+/* Three-tap crafting ritual */
+.craft-reveal{display:flex;flex-direction:column;align-items:center;gap:22px;padding:45px 12px;text-align:center}
+.craft-reveal-core{width:min(260px,75vw);aspect-ratio:1;border-radius:50%;border:2px solid rgba(125,211,252,.65);background:radial-gradient(circle at 35% 30%,rgba(93,200,255,.3),rgba(15,23,42,.96) 65%);box-shadow:0 0 40px rgba(56,189,248,.2),inset 0 0 40px rgba(56,189,248,.14);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:inherit;cursor:pointer;transition:transform .18s,box-shadow .25s;animation:craftPulse 2.3s ease-in-out infinite}
+.craft-reveal-core span{font-size:80px;filter:drop-shadow(0 0 15px #38bdf8)}
+.craft-reveal-core strong{letter-spacing:.18em;font-size:14px}
+.craft-reveal-core small{opacity:.8}
+.craft-reveal-core:active{transform:scale(.88) rotate(-5deg)}
+.craft-reveal-core:disabled{opacity:.7;cursor:wait}
+.craft-tap-progress{display:flex;gap:12px}.craft-tap-progress span{width:50px;height:6px;border-radius:20px;background:rgba(148,163,184,.3)}.craft-tap-progress span.done{background:#38bdf8;box-shadow:0 0 12px #38bdf8}
+.upgrade-inv-card.craft-allowed{outline:1px solid rgba(56,189,248,.4)}
+.upgrade-inv-card.craft-picked{outline:2px solid #38bdf8;box-shadow:0 0 16px rgba(56,189,248,.25)}
+.upgrade-inv-card.craft-locked{opacity:.35;filter:grayscale(.65)}
+@keyframes craftPulse{0%,100%{box-shadow:0 0 24px rgba(56,189,248,.18),inset 0 0 25px rgba(56,189,248,.12)}50%{box-shadow:0 0 50px rgba(56,189,248,.4),inset 0 0 40px rgba(56,189,248,.23)}}
+@media(prefers-reduced-motion:reduce){.craft-reveal-core{animation:none}}
