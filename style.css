@@ -110,3 +110,37 @@
 .draw-wheel-rotor{will-change:transform;transform-origin:50% 50%}
 .draw-wheel-item .draw-tile{box-shadow:0 0 10px #0008}
 .draw-grid-cell.active .draw-tile{border-color:#e5eaff;box-shadow:0 0 18px #a3caff}
+
+/* VIDNESD opening VFX */
+.vfx-toggle{display:flex;align-items:center;gap:9px;margin:14px 0;padding:11px 14px;border:1px solid #7664b34f;background:#14182c;border-radius:12px;color:#cbd4ee;font-size:13px;cursor:pointer}
+.vfx-toggle input{accent-color:#9e81ff;width:17px;height:17px}
+#rollArea{position:relative;isolation:isolate}
+#rollArea.vfx-running:before{content:"";position:absolute;inset:-6px;border-radius:20px;z-index:-1;background:conic-gradient(from 0deg,transparent,#8669ff55,transparent,#5beaff55,transparent);filter:blur(16px);animation:vfxAmbient 5s linear infinite;pointer-events:none}
+.draw-tile{transition:filter .25s,box-shadow .25s}
+.draw-tile.rarity-rare{box-shadow:inset 0 0 14px #399dff22}
+.draw-tile.rarity-epic{box-shadow:inset 0 0 17px #ad72ff33}
+.draw-tile.rarity-legendary{box-shadow:inset 0 0 20px #ffba4e44}
+.draw-window .draw-marker{animation:vfxMarker 1.6s ease-in-out infinite}
+.draw-grid-cell.active{filter:brightness(1.4)}
+.draw-grid-cell.active .draw-tile{animation:vfxTilePulse .3s ease-out}
+.draw-wheel-pointer{animation:vfxMarker 1.4s ease-in-out infinite}
+.draw-stack-card.winner .draw-tile{animation:vfxWinCard .8s ease-out}
+.vfx-result{position:relative;isolation:isolate;animation:vfxReveal .7s cubic-bezier(.2,1.4,.25,1) both}
+.vfx-result .big{filter:drop-shadow(0 0 24px #a688ff);animation:vfxWinCard 1.2s ease-in-out infinite alternate}
+.vfx-result.rarity-legendary .big{filter:drop-shadow(0 0 32px #ffcb5a)}
+.vfx-burst{position:absolute;inset:0;z-index:9;pointer-events:none;overflow:visible}
+.vfx-particle{position:absolute;left:50%;top:50%;color:#a6c9ff;text-shadow:0 0 12px currentColor;opacity:0;animation:vfxFly 1.45s cubic-bezier(.13,.6,.3,1) var(--delay) both}
+.vfx-burst.rarity-epic .vfx-particle{color:#c9a1ff}
+.vfx-burst.rarity-legendary .vfx-particle{color:#ffd36a}
+.vfx-burst.rarity-common .vfx-particle{color:#d3d8ed}
+.vfx-flash{position:absolute;inset:0;z-index:8;pointer-events:none;border-radius:16px;background:radial-gradient(circle,#d1f4ff9c,transparent 65%);animation:vfxFlash .8s ease-out both}
+.vfx-flash.rarity-legendary{background:radial-gradient(circle,#ffd26baf,transparent 70%)}
+.vfx-flash.rarity-epic{background:radial-gradient(circle,#c49affaf,transparent 70%)}
+@keyframes vfxAmbient{to{transform:rotate(360deg)}}
+@keyframes vfxMarker{50%{box-shadow:0 0 25px #e9d8ff;filter:brightness(1.4)}}
+@keyframes vfxTilePulse{50%{transform:scale(1.07)}}
+@keyframes vfxReveal{from{transform:scale(.65);opacity:0;filter:blur(10px)}to{transform:scale(1);opacity:1;filter:blur(0)}}
+@keyframes vfxWinCard{from{transform:translateY(0) scale(1)}to{transform:translateY(-7px) scale(1.07)}}
+@keyframes vfxFly{0%{opacity:0;transform:translate(0,0) scale(.4) rotate(0)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.2) rotate(240deg)}}
+@keyframes vfxFlash{0%{opacity:0;transform:scale(.5)}25%{opacity:.95}100%{opacity:0;transform:scale(1.4)}}
+@media(prefers-reduced-motion:reduce){#rollArea.vfx-running:before,.draw-window .draw-marker,.draw-wheel-pointer,.vfx-result,.vfx-result .big,.vfx-particle,.vfx-flash{animation:none!important}}
