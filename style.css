@@ -167,3 +167,12 @@
 .draw-cascade-card.cascade-winner{opacity:1;transform:translate(0,0) scale(1.25);filter:drop-shadow(0 0 22px #a58cff)}
 .draw-cascade-card .draw-tile{width:130px}
 @media(max-width:600px){.draw-cascade-card{left:calc(50% - 45px)}.draw-cascade-card .draw-tile{width:90px;height:125px}.draw-cascade-card .draw-tile span{font-size:37px}.draw-cascade-card.cascade-enter{transform:translate(calc((var(--lane) - 1)*85px),0)}.draw-cascade-card.cascade-exit{transform:translate(calc((var(--lane) - 1)*85px),250px)}.draw-spotlight-item .draw-tile{height:95px}.draw-spotlight-item .draw-tile span{font-size:28px}}
+
+.craft-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(240px,1fr);gap:22px;margin:22px 0}
+.craft-layout>div{padding:20px;background:#11182a;border:1px solid #303655;border-radius:18px}
+.craft-materials,.showcase-picker{display:grid;gap:9px;max-height:450px;overflow:auto;margin:15px 0}
+.craft-materials label,.showcase-picker label{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid #343a5b;background:#1a2137;border-radius:11px;cursor:pointer}
+.craft-materials label:has(input:checked),.showcase-picker label:has(input:checked){border-color:#a98dff;background:#30274c}
+.craft-materials input,.showcase-picker input{accent-color:#a58bff}
+#craftTarget{width:100%;padding:13px;background:#202741;color:#fff;border:1px solid #4c5276;border-radius:11px}
+@media(max-width:680px){.craft-layout{grid-template-columns:1fr}}
