@@ -144,3 +144,26 @@
 @keyframes vfxFly{0%{opacity:0;transform:translate(0,0) scale(.4) rotate(0)}15%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(1.2) rotate(240deg)}}
 @keyframes vfxFlash{0%{opacity:0;transform:scale(.5)}25%{opacity:.95}100%{opacity:0;transform:scale(1.4)}}
 @media(prefers-reduced-motion:reduce){#rollArea.vfx-running:before,.draw-window .draw-marker,.draw-wheel-pointer,.vfx-result,.vfx-result .big,.vfx-particle,.vfx-flash{animation:none!important}}
+
+/* Four additional card-driven opening mechanics */
+.draw-duel{display:grid;gap:13px;margin:18px 0}.draw-duel-window{position:relative;overflow:hidden;height:132px;border:1px solid #655ca0;border-radius:14px;background:linear-gradient(90deg,#11182b,#1d2140,#11182b)}
+.draw-duel-track{display:flex;align-items:center;gap:8px;height:100%;width:max-content;will-change:transform}
+.draw-duel-track .draw-tile{width:100px;height:112px}.draw-duel-track .draw-tile span{font-size:36px}.draw-duel-track .draw-tile b{font-size:10px}.draw-duel-track .draw-tile small{font-size:9px}
+.draw-duel-marker{position:absolute;left:calc(50% - 2px);top:0;bottom:0;width:4px;background:#c5e9ff;box-shadow:0 0 18px #76cbff;z-index:2}
+.draw-spotlight{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;padding:15px 5px}
+.draw-spotlight-item{min-width:0;opacity:.48;transition:opacity .14s,transform .14s,filter .14s}.draw-spotlight-item .draw-tile{width:100%;height:108px}.draw-spotlight-item .draw-tile span{font-size:35px}.draw-spotlight-item .draw-tile b{font-size:10px}.draw-spotlight-item .draw-tile small{display:none}
+.draw-spotlight-item.lit{opacity:1;transform:scale(1.07);filter:drop-shadow(0 0 13px #bba5ff);z-index:2}
+.draw-spiral{height:320px;position:relative;overflow:hidden;border-radius:18px;background:radial-gradient(circle,#2c2356,#11162a 68%,#0b1020);perspective:650px}
+.draw-spiral-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:80px;color:#8e6fff44}
+.draw-spiral-card{position:absolute;top:50%;left:50%;opacity:0;transform:translate(-50%,-50%) rotate(-75deg) translateX(180px) scale(.35);transition:transform .48s ease-out,opacity .4s;z-index:2}
+.draw-spiral-card.spiral-visible{opacity:1;transform:translate(-50%,-50%) rotate(0) translateX(0) scale(1)}
+.draw-spiral-card.spiral-gone{opacity:0;transform:translate(-50%,-50%) rotate(75deg) translateX(-190px) scale(.3)}
+.draw-spiral-card.spiral-winner{opacity:1;transform:translate(-50%,-50%) scale(1.22);filter:drop-shadow(0 0 20px #aa90ff)}
+.draw-cascade{height:310px;position:relative;overflow:hidden;border-radius:18px;background:linear-gradient(160deg,#0a1222,#292049 55%,#0a1222)}
+.draw-cascade-lane{height:100%;position:relative}
+.draw-cascade-card{position:absolute;left:calc(50% - 65px);top:calc(50% - 79px);opacity:0;transform:translate(calc((var(--lane) - 1)*125px),-230px) rotate(-25deg) scale(.6);transition:transform .5s cubic-bezier(.15,.9,.3,1),opacity .3s;filter:drop-shadow(0 10px 15px #0008)}
+.draw-cascade-card.cascade-enter{opacity:1;transform:translate(calc((var(--lane) - 1)*125px),0) rotate(0) scale(1)}
+.draw-cascade-card.cascade-exit{opacity:0;transform:translate(calc((var(--lane) - 1)*125px),250px) rotate(20deg) scale(.8)}
+.draw-cascade-card.cascade-winner{opacity:1;transform:translate(0,0) scale(1.25);filter:drop-shadow(0 0 22px #a58cff)}
+.draw-cascade-card .draw-tile{width:130px}
+@media(max-width:600px){.draw-cascade-card{left:calc(50% - 45px)}.draw-cascade-card .draw-tile{width:90px;height:125px}.draw-cascade-card .draw-tile span{font-size:37px}.draw-cascade-card.cascade-enter{transform:translate(calc((var(--lane) - 1)*85px),0)}.draw-cascade-card.cascade-exit{transform:translate(calc((var(--lane) - 1)*85px),250px)}.draw-spotlight-item .draw-tile{height:95px}.draw-spotlight-item .draw-tile span{font-size:28px}}
