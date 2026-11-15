@@ -21,18 +21,18 @@ EXTRA_CASES.push(...[["Forest Echo","🍃",420,1],["Circuit Breaker","🔌",680,
 DEMO_CASES.push(...EXTRA_CASES.map(([name,emoji,price,tier],i)=>({id:"case"+(16+i),name,emoji,price,tier})));
 // Special cases: rarity restrictions and value bands are part of the actual drop pool.
 const SPECIAL_CASES=[
- ["Rare Only","🔵",380,[0,100,0,0],85,260],
- ["Epic Vault","🟣",1250,[0,0,100,0],290,990],
- ["Legendary Vault","👑",3600,[0,0,0,100],1050,3900],
+ ["Rare Focus","🔵",380,[12,76,11,1],12,3900],
+ ["Epic Vault","🟣",1250,[12,18,66,4],12,3900],
+ ["Legendary Vault","👑",3600,[8,12,30,50],12,3900],
  ["High Roller","🎲",850,[70,0,0,30],12,3900],
  ["Budget Box","📦",90,[100,0,0,0],12,40],
- ["Premium Rare","💠",650,[0,100,0,0],160,260],
- ["Epic or Legend","🌌",2200,[0,0,75,25],290,3900],
+ ["Premium Rare","💠",650,[8,75,15,2],12,3900],
+ ["Epic or Legend","🌌",2200,[10,15,55,20],12,3900],
  ["All or Nothing","⚡",1300,[85,0,0,15],12,3900],
- ["Golden Legends","🏆",4200,[0,0,0,100],2400,3900],
+ ["Golden Legends","🏆",4200,[5,10,25,60],12,3900],
  ["Crystal Mix","🔮",980,[0,35,55,10],85,3900],
  ["Lucky Discovery","🍀",500,[30,40,25,5],12,3900],
- ["Collector Elite","🪐",1900,[0,0,90,10],600,3900]
+ ["Collector Elite","🪐",1900,[10,15,65,10],12,3900]
 ];
 DEMO_CASES.push(...SPECIAL_CASES.map(([name,emoji,price,odds,minValue,maxValue],i)=>({id:"case"+(64+i),name,emoji,price,tier:0,odds,minValue,maxValue,special:true})));
 const DEMO_EMOJI=["🌙","☄️","🦊","🦋","🪐","🐉","🦄","🌸","🌊","⚡","💎","🔮","🧿","🦉","🐺","🦁","🌌","🔥","🍀","🌈","🦅","🐈","🪷","🧊","🌠","🎭","🪼","🦈","🌻","🎐","🧬","🛰️"];
@@ -78,7 +78,7 @@ async function call(name,data={}){
   if(!materials.every(c=>c.rarity===rarity))throw Error("Все материалы должны быть одной редкости");
   const tier=DEMO_RARITIES.indexOf(rarity),value=materials.reduce((n,c)=>n+c.value,0);
   const luck=Math.max(5,Math.min(85,Math.round(18+value/(value+350)*55+tier*4)));
-  const pool=DEMO_CARDS.filter(c=>DEMO_RARITIES.indexOf(c.rarity)>=Math.max(0,tier-1)&&DEMO_RARITIES.indexOf(c.rarity)<=Math.min(3,tier+1));
+  const pool=DEMO_CARDS.filter(c=>DEMO_RARITIES.indexOf(c.rarity)>=Math.max(0,tier-2)&&DEMO_RARITIES.indexOf(c.rarity)<=Math.min(3,tier+1));
   const won=pool[randomInt(pool.length)];
   for(const id of ids){u.inventory[id]--;if(!u.inventory[id])delete u.inventory[id]}
   u.pendingCraft={cardId:won.id,luck,clicks:0,broken:false,materials:ids};
@@ -100,7 +100,7 @@ async function call(name,data={}){
   u.collected=Object.keys(u.inventory).length;demoWrite(u);
   return {click,risk,broken,finished,card,pendingCraft:u.pendingCraft,inventory:u.inventory,collected:u.collected};
  }
- if(name==="freeVC"){u.balance+=10000;demoWrite(u);return {balance:u.balance}};
+ if(name==="freeVC"){const owner=current.uid==="3gXPMPACBeftCtoSGqC6mL5T2iw2",reward=owner?10000:3000,wait=20*60*1000,now=Date.now();if(!owner&&now-(u.lastFreeVC||0)<wait)throw Error("Следующий бонус через "+Math.ceil((wait-(now-u.lastFreeVC))/60000)+" мин");u.balance+=reward;if(!owner)u.lastFreeVC=now;demoWrite(u);return {balance:u.balance,reward,nextAt:owner?0:now+wait}};
  if(name==="claimDaily"){const day=new Date().toISOString().slice(0,10);if(u.lastDaily===day)throw Error("Сегодня награда уже получена");u.balance+=150;u.lastDaily=day;demoWrite(u);return {balance:u.balance,lastDaily:day,reward:150}}
  if(name==="claimQuest"){const q=DEMO_QUESTS.find(x=>x.id===data.questId);if(!q)throw Error("Задание не найдено");if(u.claimed[q.id])throw Error("Награда уже получена");if(u[q.field]<q.target)throw Error("Задание ещё не выполнено");u.claimed[q.id]=true;u.balance+=q.reward;demoWrite(u);return {balance:u.balance,claimed:u.claimed,reward:q.reward}}
  if(name==="sellCard"){const card=DEMO_CARDS.find(x=>x.id===data.cardId);if(!card||!u.inventory[card.id])throw Error("Карточка отсутствует");u.inventory[card.id]--;if(!u.inventory[card.id])delete u.inventory[card.id];u.balance+=card.value;u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);return {inventory:u.inventory,balance:u.balance,collected:u.collected,showcase:u.showcase}}
@@ -132,8 +132,8 @@ function caseView(c){return '<div class="case"><div class="case-art">'+c.emoji+'
 function stats(){return '<div class="stats"><div class="stat"><span class="muted">Баланс</span><b>'+fmt(user?.balance)+' VC</b></div><div class="stat"><span class="muted">Открытий</span><b>'+fmt(user?.opens)+'</b></div><div class="stat"><span class="muted">Опыт</span><b>'+fmt(user?.xp)+' XP</b></div></div>'}
 function render(){document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#balance").textContent=fmt(user?.balance);$("#authBtn").textContent=current?"Выйти":"Войти";
 if(!user){app.innerHTML='<section class="hero"><div><div class="eyebrow">COLLECT · DISCOVER · LEVEL UP</div><h1>Твоя вселенная карточек</h1><p>Собирай уникальные коллекции, открывай бесплатные игровые кейсы, выполняй задания и поднимайся в рейтинге.</p><div class="actions"><button class="primary" id="join">Начать путешествие</button></div></div><div class="hero-art">💠</div></section><h2>Коллекционный мир</h2><div class="grid">'+["🌙","🐉","💎","🪐"].map((e,i)=>cardView({emoji:e,name:["Moonlight","Dragon","Crystal","Saturn"][i],rarity:["common","rare","epic","legendary"][i],value:0}).replace("0 VC","Коллекционная карточка")).join("")+'</div>';$("#join").onclick=()=>current?verifyModal():authModal();return}
-if(page==="home"){app.innerHTML='<section class="hero"><div><div class="eyebrow">WELCOME TO VIDNESD</div><h1>Открой свой Cardverse</h1><p>Собирай карточки, повышай уровень и открывай новые коллекции. Все награды исключительно игровые.</p><div class="actions"><button class="primary go" data-go="cases">Открыть кейсы</button><button class="secondary daily">Ежедневный бонус +150 VC</button><button class="secondary free-vc">Получить +10 000 VC</button></div></div><div class="hero-art">🪐</div></section>'+stats()+'<h2>Популярные кейсы</h2><div class="grid">'+cases.slice(0,8).map(caseView).join("")+'</div>'}
-if(page==="cases")app.innerHTML='<div class="section-head"><div><div class="eyebrow">CARD PACKS</div><h1>Все кейсы</h1><p>64 тематических набора. Шансы редкости показаны перед открытием.</p></div></div><div class="grid">'+cases.map(caseView).join("")+'</div>';
+if(page==="home"){app.innerHTML='<section class="hero"><div><div class="eyebrow">WELCOME TO VIDNESD</div><h1>Открой свой Cardverse</h1><p>Собирай карточки, повышай уровень и открывай новые коллекции. Все награды исключительно игровые.</p><div class="actions"><button class="primary go" data-go="cases">Открыть кейсы</button><button class="secondary daily">Ежедневный бонус +150 VC</button><button class="secondary free-vc">'+(current.uid==="3gXPMPACBeftCtoSGqC6mL5T2iw2"?"Получить +10 000 VC · Владелец":Date.now()-(user.lastFreeVC||0)<1200000?"Бонус через "+Math.ceil((1200000-(Date.now()-user.lastFreeVC))/60000)+" мин":"Получить +3 000 VC · каждые 20 мин")+'</button></div></div><div class="hero-art">🪐</div></section>'+stats()+'<h2>Популярные кейсы</h2><div class="grid">'+cases.slice(0,8).map(caseView).join("")+'</div>'}
+if(page==="cases")app.innerHTML='<div class="section-head"><div><div class="eyebrow">CARD PACKS</div><h1>Все кейсы</h1><p>76 тематических наборов. Шансы редкости показаны перед открытием.</p></div></div><div class="grid">'+cases.map(caseView).join("")+'</div>';
 if(page==="inventory"){const owned=cards.filter(c=>user.inventory?.[c.id]>0);app.innerHTML='<div class="eyebrow">MY COLLECTION</div><h1>Инвентарь</h1><p>Собрано '+owned.length+' из '+cards.length+' видов карточек</p>'+(owned.length?'<div class="grid">'+owned.map(c=>cardView(c,user.inventory[c.id])).join("")+'</div>':'<div class="empty">Пока пусто. Открой первый кейс, чтобы получить карточку.</div>')}
 if(page==="craft"){renderCraft();return}
 if(page==="upgrade"){renderUpgrade();return}
@@ -178,7 +178,7 @@ function renderCraft(){
 function authModal(mode="login"){show('<h2>'+(mode==="register"?"Создать аккаунт":mode==="reset"?"Восстановить пароль":"Войти в VIDNESD")+'</h2><form class="form" id="authForm"><label>Электронная почта<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>'+(mode==="reset"?'':'<label>Пароль (не менее 6 символов)<input type="password" name="password" minlength="6" required autocomplete="'+(mode==="register"?"new-password":"current-password")+'"></label>')+'<button class="primary" type="submit">'+(mode==="register"?"Зарегистрироваться":mode==="reset"?"Отправить письмо":"Войти")+'</button><button type="button" class="link" id="switch">'+(mode==="register"?"Уже есть аккаунт? Войти":"Создать аккаунт")+'</button><button type="button" class="link" id="reset">Забыли пароль?</button></form>');$("#switch").onclick=()=>authModal(mode==="register"?"login":"register");$("#reset").onclick=()=>authModal("reset");$("#authForm").onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);lock(async()=>{const email=fd.get("email"),password=fd.get("password");if(mode==="reset"){await sendPasswordResetEmail(auth,email);toast("Письмо отправлено");close();return}if(mode==="register"){const cred=await createUserWithEmailAndPassword(auth,email,password);await sendEmailVerification(cred.user);toast("Проверь почту и подтверди адрес");verifyModal();return}await signInWithEmailAndPassword(auth,email,password);close()})}}
 function verifyModal(){show('<h2>✉️ Подтверди почту</h2><p>Мы отправили письмо на '+escape(current?.email||"твою почту")+'. Открой ссылку в письме, затем нажми кнопку ниже.</p><div class="actions"><button class="primary" id="check">Проверить подтверждение</button><button class="secondary" id="resend">Отправить повторно</button><button class="secondary" id="verifyLogout">Выйти из аккаунта</button></div>');$("#check").onclick=()=>lock(async()=>{if(!await refreshVerification(current))throw Error("Не удалось обновить статус почты. Выйди и войди снова после подтверждения адреса.");try{await bootstrap()}catch(e){throw Error("Загрузка профиля: "+(e.code||e.message||e))}close()});$("#resend").onclick=()=>lock(async()=>{await sendEmailVerification(current);toast("Письмо отправлено")});$("#verifyLogout").onclick=()=>$("#authBtn").click()}
 async function bootstrap(){const data=await call("bootstrap");user=data.user;cases=data.cases;cards=data.cards;quests=data.quests;weights=data.weights;render()}
-async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.balance=r.balance;render();toast("Получено +10 000 VC!")})}
+async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.balance=r.balance;if(r.nextAt)user.lastFreeVC=r.nextAt-20*60*1000;render();toast("Получено +"+fmt(r.reward)+" VC!")})}
 async function daily(){await lock(async()=>{const r=await call("claimDaily");user.balance=r.balance;user.lastDaily=r.lastDaily;toast("Получено +150 VC");render();confetti()})}
 async function claim(id){await lock(async()=>{const r=await call("claimQuest",{questId:id});user.balance=r.balance;user.claimed=r.claimed;toast("Награда +"+r.reward+" VC");render();confetti()})}
 async function sell(id){await lock(async()=>{const r=await call("sellCard",{cardId:id});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;toast("Карточка продана");render()})}
