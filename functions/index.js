@@ -16,3 +16,29 @@ exports.claimDaily=onCall(async req=>{const uid=auth(req),ref=await ensure(uid,r
 exports.claimQuest=onCall(async req=>{const uid=auth(req),q=QUESTS.find(x=>x.id===req.data?.questId);if(!q)throw new HttpsError("invalid-argument","Задание не найдено");const ref=await ensure(uid,req);return db.runTransaction(async tx=>{const s=await tx.get(ref),u=s.data();if(u.claimed?.[q.id])throw new HttpsError("failed-precondition","Награда уже получена");if((u[q.field]||0)<q.target)throw new HttpsError("failed-precondition","Задание не выполнено");const claimed={...(u.claimed||{}),[q.id]:true};tx.update(ref,{balance:u.balance+q.reward,claimed});return {balance:u.balance+q.reward,claimed,reward:q.reward}})});
 exports.sellCard=onCall(async req=>{const uid=auth(req),card=CARDS.find(x=>x.id===req.data?.cardId);if(!card)throw new HttpsError("invalid-argument","Карточка не найдена");const ref=await ensure(uid,req);return db.runTransaction(async tx=>{const s=await tx.get(ref),u=s.data();const inv={...(u.inventory||{})};if(!inv[card.id])throw new HttpsError("failed-precondition","Карточки нет");inv[card.id]--;if(!inv[card.id])delete inv[card.id];tx.update(ref,{inventory:inv,balance:u.balance+card.value,collected:Object.keys(inv).length});return {inventory:inv,balance:u.balance+card.value,collected:Object.keys(inv).length}})});
 exports.leaderboard=onCall(async req=>{auth(req);const snap=await db.collection("users").orderBy("xp","desc").limit(50).get();return {leaders:snap.docs.map(x=>({uid:x.id,nick:x.data().nick,xp:x.data().xp,opens:x.data().opens}))}});
+
+
+const OWNER_UID="3gXPMPACBeftCtoSGqC6mL5T2iw2";
+function owner(req){const uid=auth(req);if(uid!==OWNER_UID)throw new HttpsError("permission-denied","Только владелец VIDNESD");return uid}
+exports.adminAdjustVC=onCall(async req=>{
+ const actor=owner(req),target=String(req.data?.uid||""),delta=req.data?.delta,reason=String(req.data?.reason||"").trim();
+ if(!/^[A-Za-z0-9]{20,128}$/.test(target)||!Number.isSafeInteger(delta)||delta===0||Math.abs(delta)>1000000||reason.length<3||reason.length>200)
+ throw new HttpsError("invalid-argument","Укажи UID, целое изменение VC до 1 000 000 и причину от 3 до 200 символов");
+ const ref=db.collection("users").doc(target),log=db.collection("adminAudit").doc();
+ return db.runTransaction(async tx=>{
+  const snap=await tx.get(ref);
+  if(!snap.exists)throw new HttpsError("not-found","Игрок ещё не создавал серверный профиль");
+  const balance=snap.data().balance||0,next=balance+delta;
+  if(next<0||next>Number.MAX_SAFE_INTEGER)throw new HttpsError("failed-precondition","Недопустимый баланс");
+  tx.update(ref,{balance:next});
+  tx.create(log,{actor,target,delta,reason,before:balance,after:next,createdAt:admin.firestore.FieldValue.serverTimestamp()});
+  return {uid:target,balance:next};
+ });
+});
+exports.adminGetUser=onCall(async req=>{
+ owner(req);const uid=String(req.data?.uid||"");
+ if(!/^[A-Za-z0-9]{20,128}$/.test(uid))throw new HttpsError("invalid-argument","Неверный UID");
+ const snap=await db.collection("users").doc(uid).get();
+ if(!snap.exists)throw new HttpsError("not-found","Серверный профиль не найден");
+ return {user:safeUser(snap.data())};
+});
