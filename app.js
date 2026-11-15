@@ -117,6 +117,15 @@ function renderUpgrade(){
  $("#upgradeClose").onclick=close;if(r.success)confetti()
  })
 }
+let openingEffects=true;
+function openingBurst(host,rarity="rare",count=26){
+ if(!openingEffects||matchMedia("(prefers-reduced-motion: reduce)").matches||!host)return;
+ const layer=document.createElement("div");layer.className="vfx-burst rarity-"+rarity;host.append(layer);
+ const symbols=["✦","✧","◆","·","✶"];
+ for(let i=0;i<count;i++){const p=document.createElement("span");p.className="vfx-particle";p.textContent=symbols[i%symbols.length];const angle=i/count*Math.PI*2+(Math.random()-.5)*.35,dist=70+Math.random()*180;p.style.setProperty("--dx",Math.cos(angle)*dist+"px");p.style.setProperty("--dy",Math.sin(angle)*dist+"px");p.style.setProperty("--delay",Math.random()*.22+"s");p.style.fontSize=(10+Math.random()*18)+"px";layer.append(p)}
+ setTimeout(()=>layer.remove(),1900)
+}
+function openingFlash(host,rarity){if(!openingEffects||!host)return;const e=document.createElement("div");e.className="vfx-flash rarity-"+rarity;host.append(e);setTimeout(()=>e.remove(),1000)}
 function openingTile(c){return '<div class="draw-tile rarity-'+c.rarity+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC</small></div>'}
 async function playOpening(area,style,win,duration){
  const pick=()=>cards[randomInt(cards.length)],pause=t=>new Promise(resolve=>setTimeout(resolve,t));
@@ -184,9 +193,10 @@ async function playOpening(area,style,win,duration){
 }
 async function openCase(id){
  const c=cases.find(x=>x.id===id);if(!c)return;const w=weights[c.tier];
- show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
+ show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
+ $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
  $("#preview").onclick=()=>show('<h2>Карточки коллекции</h2><div class="grid">'+cards.map(x=>cardView(x)).join("")+'</div>');
  $("#startRoll").onclick=()=>lock(async()=>{
   if(user.balance<c.price)throw Error("Недостаточно VC");
@@ -196,10 +206,15 @@ async function openCase(id){
   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
   const area=$("#rollArea");if(!area)return;
   const duration=chosenDuration==="epic"?12500:chosenDuration==="long"?9500:7200;
+  if(openingEffects){area.classList.add("vfx-running");area.style.setProperty("--vfx-duration",duration+"ms")}
   await playOpening(area,chosenStyle,r.card,duration);
+  area.classList.remove("vfx-running");
+  openingFlash(area,r.card.rarity);openingBurst(area,r.card.rarity,r.card.rarity==="legendary"?55:30);
+  await sleep(650);
   if(!document.body.contains(area))return;
   area.innerHTML='<div class="result rarity-'+r.card.rarity+'"><div class="big">'+r.card.emoji+'</div><h2>'+escape(r.card.name)+'</h2><p>'+r.card.rarity.toUpperCase()+' · '+r.card.value+' VC</p><button class="primary" id="again">Ещё раз</button></div>';
-  $("#again").onclick=()=>openCase(id);confetti();toast("Карточка добавлена в инвентарь");
+  const resultEl=area.querySelector(".result");if(resultEl){resultEl.classList.add("vfx-result");openingBurst(resultEl,r.card.rarity,r.card.rarity==="legendary"?55:24)}
+  $("#again").onclick=()=>openCase(id);if(openingEffects)confetti();toast("Карточка добавлена в инвентарь");
  })
 }
 
