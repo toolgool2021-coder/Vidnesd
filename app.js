@@ -57,6 +57,14 @@ const DEMO_WEIGHTS=[[75,20,4.5,.5],[65,26,8,1],[53,32,13,2],[42,35,19,4]];
 function caseOdds(c){return c.odds||DEMO_WEIGHTS[c.tier]}
 function casePool(c,rarity){return DEMO_CARDS.filter(card=>card.rarity===rarity&&(!c.special||(card.value>=c.minValue&&card.value<=c.maxValue)))}
 function caseAvailable(c){return DEMO_RARITIES.flatMap((rarity,i)=>caseOdds(c)[i]>0?casePool(c,rarity):[])}
+function upgradeRewards(total){return DEMO_CARDS.filter(c=>c.value>total&&c.value<=total*4)}
+function upgradeOdds(total,rewards){
+ if(!rewards.length)return {chance:0,average:0};
+ const weights=rewards.map(c=>1/Math.pow(c.value/total,1.7));
+ const sum=weights.reduce((a,b)=>a+b,0);
+ const average=rewards.reduce((n,c,i)=>n+c.value*weights[i],0)/sum;
+ return {chance:Math.round(Math.min(65,Math.max(8,80*total/average))*100)/100,average};
+}
 const DEMO_QUESTS=[{id:"open3",name:"Открой 3 кейса",target:3,reward:180,field:"opens"},{id:"open10",name:"Открой 10 кейсов",target:10,reward:350,field:"opens"},{id:"collect5",name:"Собери 5 карточек",target:5,reward:250,field:"collected"},{id:"level5",name:"Набери 500 XP",target:500,reward:500,field:"xp"}];
 const demoKey=()=> "vidnesd_demo_v1_"+current.uid;
 const randomInt=n=>{const a=new Uint32Array(1);crypto.getRandomValues(a);return Math.floor(a[0]/4294967296*n)};
@@ -115,7 +123,31 @@ async function call(name,data={}){
  if(name==="claimDaily"){const day=new Date().toISOString().slice(0,10);if(u.lastDaily===day)throw Error("Сегодня награда уже получена");u.balance+=150;u.lastDaily=day;demoWrite(u);return {balance:u.balance,lastDaily:day,reward:150}}
  if(name==="claimQuest"){const q=DEMO_QUESTS.find(x=>x.id===data.questId);if(!q)throw Error("Задание не найдено");if(u.claimed[q.id])throw Error("Награда уже получена");if(u[q.field]<q.target)throw Error("Задание ещё не выполнено");u.claimed[q.id]=true;u.balance+=q.reward;demoWrite(u);return {balance:u.balance,claimed:u.claimed,reward:q.reward}}
  if(name==="sellCard"){const card=[...DEMO_CARDS,...(u.customCards||[])].find(x=>x.id===data.cardId);if(!card||!u.inventory[card.id])throw Error("Карточка отсутствует");u.inventory[card.id]--;if(!u.inventory[card.id])delete u.inventory[card.id];u.balance+=card.value;u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);return {inventory:u.inventory,balance:u.balance,collected:u.collected,showcase:u.showcase}}
- if(name==="upgradeCard"){const target=DEMO_CARDS.find(x=>x.id===data.targetId),selected=Array.isArray(data.sourceIds)?data.sourceIds:[];if(!target||!selected.length||selected.length>5)throw Error("Выбери от 1 до 5 карточек");const counts={};for(const id of selected)counts[id]=(counts[id]||0)+1;let total=0;for(const [id,count] of Object.entries(counts)){const card=DEMO_CARDS.find(x=>x.id===id);if(!card||card.value>=target.value||Number(u.inventory[id]||0)<count)throw Error("Недостаточно подходящих карточек");total+=card.value*count}const chance=Math.min(100,Math.round(total/target.value*10000)/100),roll=randomInt(1000000)/10000,success=roll<chance;for(const [id,count] of Object.entries(counts)){u.inventory[id]-=count;if(!u.inventory[id])delete u.inventory[id]}if(success)u.inventory[target.id]=(u.inventory[target.id]||0)+1;u.collected=Object.keys(u.inventory).length;demoWrite(u);return {inventory:u.inventory,collected:u.collected,card:target,chance,roll,success}};
+ if(name==="upgradeCard"){
+  const selected=Array.isArray(data.sourceIds)?data.sourceIds:[];
+  if(!selected.length||selected.length>5)throw Error("Выбери от 1 до 5 карточек");
+  const counts={};for(const id of selected)counts[id]=(counts[id]||0)+1;
+  let total=0;
+  for(const [id,count] of Object.entries(counts)){
+   const card=[...DEMO_CARDS,...(u.customCards||[])].find(x=>x.id===id);
+   if(!card||Number(u.inventory[id]||0)<count)throw Error("Недостаточно карточек");
+   total+=card.value*count;
+  }
+  const rewards=upgradeRewards(total);
+  if(!rewards.length)throw Error("Нет предметов дороже выбранных материалов. Уменьши сумму.");
+  const {chance}=upgradeOdds(total,rewards),roll=randomInt(1000000)/10000,success=roll<chance;
+  let card=null;
+  if(success){
+   const weights=rewards.map(c=>1/Math.pow(c.value/total,1.7));
+   let n=randomInt(1000000)/1000000*weights.reduce((a,b)=>a+b,0);
+   card=rewards[rewards.length-1];
+   for(let i=0;i<rewards.length;i++){n-=weights[i];if(n<0){card=rewards[i];break}}
+  }
+  for(const [id,count] of Object.entries(counts)){u.inventory[id]-=count;if(!u.inventory[id])delete u.inventory[id]}
+  if(card)u.inventory[card.id]=(u.inventory[card.id]||0)+1;
+  u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);
+  return {inventory:u.inventory,collected:u.collected,showcase:u.showcase,card,chance,roll,success,total};
+ }
  if(name==="openCase"){
   const cs=DEMO_CASES.find(x=>x.id===data.caseId);if(!cs)throw Error("Кейс не найден");
   if(u.operations[data.operationId])return u.operations[data.operationId];
@@ -245,22 +277,22 @@ const OPEN_DURATIONS=[["normal","Обычная"],["long","Длинная"],["ep
 
 function renderUpgrade(){
  const owned=cards.filter(c=>(user.inventory?.[c.id]||0)>0);
- if(!upgradeTarget)upgradeTarget=cards.find(c=>c.value>=350)?.id||cards[0]?.id;
- const target=cards.find(c=>c.id===upgradeTarget)||cards[0];
  const total=upgradeSelected.reduce((sum,id)=>sum+(cards.find(c=>c.id===id)?.value||0),0);
- const percentage=Math.min(100,Math.round(total/target.value*10000)/100);
- app.innerHTML='<div class="eyebrow">CARD FORGE · CHANCE UPGRADE</div><h1>Апгрейд карточек 2.0</h1><p>Выбери до 5 карточек и цель. Шанс зависит от стоимости материалов. При неудаче материалы расходуются. Только игровые предметы.</p><div class="upgrade-layout"><div class="upgrade-panel"><h3>Материалы <small>'+upgradeSelected.length+'/5</small></h3><div class="upgrade-slots">'+Array.from({length:5},(_,i)=>{const c=cards.find(x=>x.id===upgradeSelected[i]);return '<button class="upgrade-slot" data-slot="'+i+'">'+(c?'<span>'+c.emoji+'</span><small>'+escape(c.name)+'</small>':'<span>＋</span><small>Слот '+(i+1)+'</small>')+'</button>'}).join("")+'</div><p>Стоимость материалов: <b>'+fmt(total)+' VC</b></p></div><div class="upgrade-center"><div class="upgrade-ring" style="--progress:'+percentage+'%"><div><strong>'+percentage+'%</strong><small>Шанс успеха</small></div></div><p>'+(percentage>=100?'Гарантированный результат':'Шанс успеха: '+percentage+'%. При неудаче материалы исчезнут')+'</p><button class="primary" id="upgradeNow" '+(!upgradeSelected.length?'disabled':'')+'>⚡ Испытать шанс</button></div><div class="upgrade-panel"><h3>Целевая карточка</h3><div class="upgrade-target"><div class="upgrade-big">'+target.emoji+'</div><b>'+escape(target.name)+'</b><span class="tag">'+target.rarity.toUpperCase()+'</span><strong>'+fmt(target.value)+' VC</strong></div><label class="upgrade-label">Выбери результат<select id="upgradeTarget">'+cards.filter(c=>c.value>0).sort((a,b)=>a.value-b.value).map(c=>'<option value="'+c.id+'" '+(c.id===target.id?'selected':'')+'>'+c.emoji+' '+escape(c.name)+' · '+fmt(c.value)+' VC</option>').join("")+'</select></label></div></div><h2>Твой инвентарь</h2><p>Нажми на карточку, чтобы добавить её в материалы. Можно использовать несколько одинаковых.</p><div class="upgrade-inventory">'+(owned.length?owned.map(c=>'<button class="upgrade-inv-card" data-add="'+c.id+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC · ×'+user.inventory[c.id]+'</small></button>').join(""):'<div class="empty">Инвентарь пуст. Открой кейсы, чтобы получить материалы.</div>')+'</div>';
- document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{const id=b.dataset.add;const card=cards.find(x=>x.id===id);if(upgradeSelected.length>=5)return toast("Максимум 5 материалов");if(card.value>=target.value)return toast("Материал должен быть дешевле результата");if(upgradeSelected.filter(x=>x===id).length>=user.inventory[id])return toast("Больше копий нет");upgradeSelected.push(id);renderUpgrade()});
+ const rewards=upgradeRewards(total);
+ const {chance,average}=total?upgradeOdds(total,rewards):{chance:0,average:0};
+ const minReward=rewards.length?Math.min(...rewards.map(c=>c.value)):0;
+ const maxReward=rewards.length?Math.max(...rewards.map(c=>c.value)):0;
+ app.innerHTML='<div class="eyebrow">CARD FORGE · RANDOM UPGRADE</div><h1>Апгрейд карточек 3.0</h1><p>Выбери до 5 карточек. Награда определяется случайно и всегда дороже суммы материалов при успехе. Чем дороже возможная награда, тем ниже шанс. При неудаче материалы исчезают.</p><div class="upgrade-layout"><div class="upgrade-panel"><h3>Материалы <small>'+upgradeSelected.length+'/5</small></h3><div class="upgrade-slots">'+Array.from({length:5},(_,i)=>{const c=cards.find(x=>x.id===upgradeSelected[i]);return '<button class="upgrade-slot" data-slot="'+i+'">'+(c?'<span>'+c.emoji+'</span><small>'+escape(c.name)+'</small>':'<span>＋</span><small>Слот '+(i+1)+'</small>')+'</button>'}).join("")+'</div><p>Стоимость материалов: <b>'+fmt(total)+' VC</b></p></div><div class="upgrade-center"><div class="upgrade-ring" style="--progress:'+chance+'%"><div><strong>'+chance+'%</strong><small>Шанс успеха</small></div></div><p>'+(rewards.length?'В случае успеха предмет будет дороже вложений':'Выбери материалы на сумму ниже стоимости доступных карточек')+'</p><button class="primary" id="upgradeNow" '+(!upgradeSelected.length||!rewards.length?'disabled':'')+'>⚡ Испытать шанс</button></div><div class="upgrade-panel"><h3>Случайная награда</h3><div class="upgrade-target"><div class="upgrade-big">🎁</div><b>Неизвестный предмет</b><span class="tag">RANDOM UPGRADE</span><strong>'+(rewards.length?fmt(minReward)+'–'+fmt(maxReward)+' VC':'Нет доступных наград')+'</strong><p>Средняя цена при успехе: '+fmt(Math.round(average))+' VC</p><p>Доступно '+rewards.length+' карточек</p></div></div></div><h2>Твой инвентарь</h2><p>Нажми на карточку, чтобы добавить её в материалы. Можно использовать несколько одинаковых.</p><div class="upgrade-inventory">'+(owned.length?owned.map(c=>'<button class="upgrade-inv-card" data-add="'+c.id+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC · ×'+user.inventory[c.id]+'</small></button>').join(""):'<div class="empty">Инвентарь пуст. Открой кейсы, чтобы получить материалы.</div>')+'</div>';
+ document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{const id=b.dataset.add;if(upgradeSelected.length>=5)return toast("Максимум 5 материалов");if(upgradeSelected.filter(x=>x===id).length>=user.inventory[id])return toast("Больше копий нет");upgradeSelected.push(id);renderUpgrade()});
  document.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.slot);if(i<upgradeSelected.length){upgradeSelected.splice(i,1);renderUpgrade()}});
- $("#upgradeTarget").onchange=e=>{upgradeTarget=e.target.value;upgradeSelected=[];renderUpgrade()};
  $("#upgradeNow").onclick=()=>lock(async()=>{
- const r=await call("upgradeCard",{sourceIds:upgradeSelected,targetId:target.id});
- user.inventory=r.inventory;user.collected=r.collected;upgradeSelected=[];renderUpgrade();
- show('<div class="upgrade-success"><div class="upgrade-spin" style="--chance:'+r.chance+'%"><div class="upgrade-needle"><div class="upgrade-needle-tip"></div><div class="upgrade-needle-shaft"></div></div><div class="upgrade-spin-center">'+r.chance+'%<small>Шанс успеха</small></div></div><p>Проверяем результат...</p></div>');
- await sleep(100);const needle=body.querySelector(".upgrade-needle");if(needle){needle.style.setProperty("--end-angle",(1800+r.roll*3.6)+"deg");needle.classList.add("spinning")}
- await sleep(3200);
- show('<div class="upgrade-success"><div class="upgrade-big">'+(r.success?r.card.emoji:"💠")+'</div><h2>'+(r.success?"Улучшение успешно!":"Улучшение не удалось")+'</h2><p>Шанс '+r.chance+'% · Выпало '+r.roll.toFixed(2)+'%</p><p>'+(r.success?escape(r.card.name)+" добавлена в коллекцию":"Материалы использованы")+'</p><button class="primary" id="upgradeClose">Продолжить</button></div>');
- $("#upgradeClose").onclick=close;if(r.success)confetti()
+  const r=await call("upgradeCard",{sourceIds:[...upgradeSelected]});
+  user.inventory=r.inventory;user.collected=r.collected;user.showcase=r.showcase;upgradeSelected=[];renderUpgrade();
+  show('<div class="upgrade-success"><div class="upgrade-spin" style="--chance:'+r.chance+'%"><div class="upgrade-needle"><div class="upgrade-needle-tip"></div><div class="upgrade-needle-shaft"></div></div><div class="upgrade-spin-center">'+r.chance+'%<small>Шанс успеха</small></div></div><p>Проверяем результат...</p></div>');
+  await sleep(100);const needle=body.querySelector(".upgrade-needle");if(needle){needle.style.setProperty("--end-angle",(1800+r.roll*3.6)+"deg");needle.classList.add("spinning")}
+  await sleep(3200);
+  show('<div class="upgrade-success"><div class="upgrade-big">'+(r.success?r.card.emoji:"💠")+'</div><h2>'+(r.success?"Улучшение успешно!":"Улучшение не удалось")+'</h2><p>Шанс '+r.chance+'% · Выпало '+r.roll.toFixed(2)+'%</p><p>'+(r.success?escape(r.card.name)+' · '+fmt(r.card.value)+' VC (прибыль +'+fmt(r.card.value-r.total)+' VC)':'Материалы потеряны')+'</p><button class="primary" id="upgradeClose">Продолжить</button></div>');
+  $("#upgradeClose").onclick=close;if(r.success)confetti()
  })
 }
 let openingEffects=true;
