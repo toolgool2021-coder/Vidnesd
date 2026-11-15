@@ -76,3 +76,32 @@
 @keyframes pulseEffect{0%{transform:scale(.5);opacity:.3}20%,40%,60%,80%{transform:scale(1.4);opacity:1}30%,50%,70%{transform:scale(.75)}100%{transform:scale(2);opacity:0}}
 @keyframes meteorEffect{0%{transform:translate(-240px,-150px) rotate(-30deg) scale(.2);opacity:0}35%{transform:translate(40px,30px) rotate(20deg) scale(1.2);opacity:1}65%{transform:translate(-30px,-15px) rotate(-15deg) scale(.9)}100%{transform:translate(0,0) rotate(0) scale(2);opacity:0}}
 @media(prefers-reduced-motion:reduce){.opening-stage .opening-object,.opening-aura,.opening-progress span{animation:none!important}}
+
+/* Real card-selection opening modes */
+.draw-tile{box-sizing:border-box;width:130px;height:158px;flex:none;border:2px solid #69718d;border-radius:13px;background:linear-gradient(145deg,#242b46,#11182c);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;text-align:center;color:#fff}
+.draw-tile span{font-size:51px}.draw-tile b{font-size:12px;line-height:1.2}.draw-tile small{font-size:10px;color:#b5c2dd}
+.draw-tile.rarity-common{border-color:#8b96ac}.draw-tile.rarity-rare{border-color:#4aa6ff}.draw-tile.rarity-epic{border-color:#ad72ff}.draw-tile.rarity-legendary{border-color:#ffba4e}
+.draw-window{position:relative;overflow:hidden;height:205px;border:1px solid #7782ad;border-radius:18px;background:#0a0e1d;margin:20px 0}
+.draw-track{display:flex;align-items:center;gap:8px;width:max-content;height:100%;will-change:transform}
+.draw-marker{position:absolute;z-index:3;pointer-events:none;left:calc(50% - 2px);top:0;bottom:0;width:4px;background:#fff;box-shadow:0 0 18px #7eefff}
+.draw-vertical{height:320px;max-width:340px;margin:20px auto}.draw-vertical .draw-track{width:100%;height:max-content;flex-direction:column;padding:0}.draw-vertical .draw-marker{left:0;right:0;top:calc(50% - 2px);bottom:auto;width:auto;height:4px}
+.draw-slots{max-width:360px;margin:20px auto;border:5px solid #6552aa;box-shadow:inset 0 0 30px #7049c944}
+.draw-perspective .draw-tile{transform:perspective(400px) rotateY(-12deg)}
+.draw-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px;padding:10px;border-radius:16px;background:#0d1222;margin:18px 0}
+.draw-grid-cell{min-width:0;border:2px solid transparent;border-radius:10px;transition:border-color .08s,transform .08s}.draw-grid-cell .draw-tile{width:100%;height:90px;gap:3px;padding:4px}.draw-grid-cell .draw-tile span{font-size:28px}.draw-grid-cell .draw-tile b{font-size:9px}.draw-grid-cell .draw-tile small{display:none}
+.draw-grid-cell.active{border-color:#fff;box-shadow:0 0 17px #9be6ff;transform:scale(1.05);z-index:2}
+.draw-shuffle{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:20px 6px;perspective:700px}
+.draw-shuffle-card{height:125px;position:relative;transition:transform .25s;transform-style:preserve-3d}
+.draw-back,.draw-front{position:absolute;inset:0;backface-visibility:hidden;border:1px solid #9c86ff;border-radius:13px;display:grid;place-items:center;background:linear-gradient(140deg,#30205d,#151b36);font-size:42px}
+.draw-front{transform:rotateY(180deg)}.draw-front .draw-tile{width:100%;height:100%}.draw-front .draw-tile span{font-size:32px}.draw-front .draw-tile b{font-size:10px}.draw-front .draw-tile small{display:none}
+.draw-shuffle-card.revealed{transform:rotateY(180deg)!important}.draw-shuffle-card.selected{filter:drop-shadow(0 0 18px #9d86ff)}
+.draw-wheel{position:relative;height:320px;overflow:hidden;display:grid;place-items:center;background:radial-gradient(circle,#25234d,#0b1020 75%);border-radius:16px}
+.draw-wheel-rotor{width:270px;height:270px;border-radius:50%;position:relative;border:3px solid #947bff;box-shadow:0 0 25px #7966ee55}
+.draw-wheel-item{position:absolute;left:calc(50% - 36px);top:calc(50% - 40px);transform:rotate(var(--angle)) translateY(-99px) rotate(calc(-1 * var(--angle)));width:72px;height:80px}
+.draw-wheel-item .draw-tile{width:72px;height:80px;gap:2px;padding:2px}.draw-wheel-item .draw-tile span{font-size:28px}.draw-wheel-item .draw-tile b{font-size:8px}.draw-wheel-item .draw-tile small{display:none}
+.draw-wheel-pointer{position:absolute;top:8px;left:calc(50% - 13px);font-size:26px;color:#fff;z-index:3;filter:drop-shadow(0 0 8px #fff)}
+.draw-stack{height:250px;position:relative;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle,#252249,#0c1222);border-radius:16px;margin:18px 0}
+.draw-stack-card{position:absolute;transform:translate(calc(var(--depth)*.5px),calc(var(--depth)*-.4px)) rotate(calc(var(--depth)*.8deg));transition:transform .4s,opacity .4s;z-index:calc(20 - var(--depth))}
+.draw-stack-card.discarded{transform:translateX(440px) rotate(45deg);opacity:0}
+.draw-stack-card.winner{transform:scale(1.15);filter:drop-shadow(0 0 22px #c6aaff)}
+@media(max-width:600px){.draw-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.draw-grid-cell .draw-tile{height:82px}.draw-shuffle{gap:6px}.draw-shuffle-card{height:100px}.draw-tile{width:115px}.draw-wheel{height:300px}}
