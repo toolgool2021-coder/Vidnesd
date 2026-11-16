@@ -23,6 +23,21 @@ service cloud.firestore {
         && request.resource.data.balance <= 1000000000;
     }
 
+    // Prototype account-based save. Client-writable: not anti-cheat secure.
+    match /gameProfiles/{uid} {
+      allow read: if isSelf(uid);
+      allow create, update: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['state','updatedAt'])
+        && request.resource.data.state is map
+        && request.resource.data.state.uid == uid
+        && request.resource.data.state.inventory is map
+        && request.resource.data.state.balance is number
+        && request.resource.data.state.balance >= 0
+        && request.resource.data.state.balance <= 1000000000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+    }
+
     // Public leaderboard snapshot; clients cannot forge rankings.
     match /leaderboard/{uid} {
       allow read: if true;
