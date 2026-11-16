@@ -194,7 +194,7 @@ if(page==="craft"){renderCraft();return}
 if(page==="upgrade"){renderUpgrade();return}
 if(page==="quests"){app.innerHTML='<div class="eyebrow">REWARDS</div><h1>Задания</h1><p>Получай бесплатные VC за достижения и активность.</p>'+quests.map(q=>{const val=user[q.field]||0,done=user.claimed?.[q.id];return '<div class="quest"><div><strong>'+escape(q.name)+'</strong><span class="muted">'+Math.min(val,q.target)+' / '+q.target+' · +'+q.reward+' VC</span></div><button class="'+(done?'secondary':'primary')+' claim" data-id="'+q.id+'" '+(done||val<q.target?'disabled':'')+'>'+(done?'Получено':val>=q.target?'Забрать':'В процессе')+'</button></div>'}).join("")}
 if(page==="profile"){app.innerHTML='<div class="eyebrow">PLAYER PROFILE</div><h1>◈ '+escape(user.nick)+'</h1><p>Подтверждённая почта: '+escape(current.email)+'</p><form id="nickForm" class="form"><label>Твой уникальный ник (3–20 символов, латиница, цифры, _)<input name="nick" required minlength="3" maxlength="20" value="'+escape(user.nick||'')+'"></label><button class="primary" type="submit">Сохранить ник</button></form>'+stats()+'<h2>Достижения</h2><div class="grid">'+[{t:"Первый кейс",n:1},{t:"Коллекционер",n:10},{t:"Мастер кейсов",n:50},{t:"Легенда",n:100}].map(x=>'<div class="stat"><b>'+(user.opens>=x.n?'🏆':'🔒')+'</b>'+x.t+'<p>Открытий: '+x.n+'</p></div>').join("")+'</div>'}
-if(page==="leaders"){app.innerHTML='<div class="eyebrow">TOP COLLECTORS</div><h1>Лидерборд VIDNESD</h1><p>Общий рейтинг по XP и открытиям. Данные синхронизируются с Firestore, но пока не защищены от накрутки.</p><div class="stats"><div class="stat"><span class="muted">Твой XP (локально)</span><b>'+fmt(user.xp)+'</b></div><div class="stat"><span class="muted">Твои открытия (локально)</span><b>'+fmt(user.opens)+'</b></div></div><div class="actions"><button class="secondary" id="sortXp">По XP</button><button class="secondary" id="sortOpens">По открытиям</button></div><div id="leaders">Загружаем рейтинг...</div>';$("#sortXp").onclick=()=>loadLeaders("xp");$("#sortOpens").onclick=()=>loadLeaders("opens");loadLeaders(leaderboardSort)}
+if(page==="leaders"){app.innerHTML='<div class="eyebrow">TOP COLLECTORS</div><h1>Лидерборд VIDNESD</h1><p>Общий рейтинг по XP и открытиям. Данные синхронизируются с Firestore, но пока не защищены от накрутки.</p><div class="stats"><div class="stat"><span class="muted">Твой XP (локально)</span><b>'+fmt(user.xp)+'</b></div><div class="stat"><span class="muted">Твои открытия (локально)</span><b>'+fmt(user.opens)+'</b></div></div><div class="actions"><button class="secondary" id="sortXp">По XP</button><button class="secondary" id="sortOpens">По открытиям</button></div><div id="leaders">Загружаем рейтинг...</div>';$("#sortXp").onclick=()=>selectLeaderboardSort("xp");$("#sortOpens").onclick=()=>selectLeaderboardSort("opens");loadLeaders()}
 bind();if(page==="profile"){$("#nickForm").onsubmit=e=>{e.preventDefault();lock(async()=>{await saveNickname(new FormData(e.target).get("nick"));toast("Ник сохранён");render()})};const showcase=$("#editShowcase");if(showcase)showcase.onclick=editShowcase}}
 function bind(){document.querySelectorAll(".open").forEach(b=>b.onclick=()=>openCase(b.dataset.id));document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id));document.querySelectorAll(".claim").forEach(b=>b.onclick=()=>claim(b.dataset.id));document.querySelectorAll(".daily").forEach(b=>b.onclick=daily);document.querySelectorAll(".free-vc").forEach(b=>b.onclick=freeVC);document.querySelectorAll(".go").forEach(b=>b.onclick=()=>{page=b.dataset.go;render()})}
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});
@@ -294,18 +294,34 @@ async function claim(id){await lock(async()=>{const r=await call("claimQuest",{q
 async function sell(id){await lock(async()=>{const r=await call("sellCard",{cardId:id});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;toast("Карточка продана");render()})}
 let leaderboardRequestId=0;
 let leaderboardSort="xp";
-async function loadLeaders(sort="xp"){
+let leaderboardCache=[];
+function drawLeaders(){
+ const el=$("#leaders");
+ if(page!=="leaders"||!el)return;
+ const sort=leaderboardSort;
+ for(const [id,key] of [["sortXp","xp"],["sortOpens","opens"]]){
+  const button=document.getElementById(id);
+  if(button){button.classList.toggle("active",sort===key);button.setAttribute("aria-pressed",String(sort===key))}
+ }
+ const leaders=[...leaderboardCache].sort((a,b)=>(b[sort]||0)-(a[sort]||0)||(b.xp||0)-(a.xp||0)).slice(0,50);
+ el.innerHTML=leaders.length?'<p>Топ '+leaders.length+' игроков · '+(sort==="xp"?"по XP":"по открытиям")+'</p>'+leaders.map((x,i)=>'<div class="leader"><span><b>'+(i+1)+'.</b> '+escape(x.nick)+'</span><span>'+fmt(x.xp)+' XP · '+fmt(x.opens)+' открытий</span></div>').join(""):'<div class="empty"><h3>Пока нет игроков в рейтинге</h3><p>Результаты появятся после синхронизации статистики с Firestore.</p></div>';
+}
+function selectLeaderboardSort(sort){
+ if(sort!=="xp"&&sort!=="opens")return;
  leaderboardSort=sort;
+ drawLeaders();
+}
+async function loadLeaders(){
+ const el=$("#leaders");if(!el)return;
  const requestId=++leaderboardRequestId;
- document.querySelectorAll("#sortXp,#sortOpens").forEach(b=>{b.classList.toggle("active",b.id===(sort==="xp"?"sortXp":"sortOpens"));b.setAttribute("aria-pressed",String(b.classList.contains("active")))});
- const el=$("#leaders");if(!el||!db)return;
+ if(!db){el.textContent="Firestore не подключён";return}
  el.textContent="Загружаем рейтинг...";
  try{
   const snapshot=await getDocs(query(collection(db,"leaderboard"),limit(100)));
-  if(page!=="leaders"||requestId!==leaderboardRequestId||document.querySelector("#leaders")!==el)return;
-  const leaders=snapshot.docs.map(d=>d.data()).filter(x=>typeof x.nick==="string"&&Number.isSafeInteger(x.xp)&&x.xp>=0&&Number.isSafeInteger(x.opens)&&x.opens>=0).sort((a,b)=>b[sort]-a[sort]||b.xp-a.xp).slice(0,50);
-  el.innerHTML=leaders.length?'<p>Топ '+leaders.length+' игроков · '+(sort==="xp"?"по XP":"по открытиям")+'</p>'+leaders.map((x,i)=>'<div class="leader"><span><b>'+(i+1)+'.</b> '+escape(x.nick)+'</span><span>'+fmt(x.xp)+' XP · '+fmt(x.opens)+' открытий</span></div>').join(""):'<div class="empty"><h3>Пока нет игроков в рейтинге</h3><p>Рейтинг пополняется при входе игроков с подтверждённой почтой. Если ты только что вошёл, обнови страницу.</p></div>';
- }catch(e){if(page==="leaders"&&requestId===leaderboardRequestId&&document.querySelector("#leaders")===el)el.textContent="Не удалось загрузить рейтинг: "+(e.code||e.message)}
+  if(requestId!==leaderboardRequestId||page!=="leaders"||document.getElementById("leaders")!==el)return;
+  leaderboardCache=snapshot.docs.map(d=>d.data()).filter(x=>typeof x.nick==="string"&&Number.isFinite(Number(x.xp))&&Number.isFinite(Number(x.opens))&&Number(x.xp)>=0&&Number(x.opens)>=0).map(x=>({nick:x.nick,xp:Number(x.xp),opens:Number(x.opens)}));
+  drawLeaders();
+ }catch(e){if(requestId===leaderboardRequestId&&document.getElementById("leaders")===el){el.textContent="Не удалось загрузить рейтинг: "+(e.code||e.message);console.error("[VIDNESD] leaderboard",e)}}
 }
 function confetti(){if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
 const sleep=t=>new Promise(r=>setTimeout(r,t));
