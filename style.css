@@ -245,3 +245,12 @@
 @keyframes craftRouletteSpin{from{transform:rotate(0)}to{transform:rotate(1800deg)}}
 @media(max-width:600px){.trade-picker-grid{grid-template-columns:repeat(3,minmax(0,1fr));max-height:270px}.trade-card-art{font-size:27px}.trade-card-choice{padding:10px 5px}}
 @media(prefers-reduced-motion:reduce){.craft-roulette-spinning{animation:none}}
+
+/* v35 — blocking cloud save indicator */
+.cloud-save-overlay{position:fixed;inset:0;z-index:1000;background:#070b17e8;backdrop-filter:blur(16px);display:grid;place-items:center;padding:18px}
+.cloud-save-box{width:min(390px,100%);text-align:center;background:linear-gradient(150deg,#1d2340,#101626);border:1px solid #8d75e94a;border-radius:22px;padding:32px 24px;box-shadow:0 25px 90px #000a}
+.cloud-save-box h3{font-size:21px;margin:18px 0 6px}.cloud-save-box p{font-size:13px;margin:0 0 22px;color:#a5b1ce}
+.cloud-save-spinner{width:70px;height:70px;border:5px solid #343554;border-top-color:#ae8aff;border-right-color:#56c8ec;border-radius:50%;animation:cloudSaveSpin .9s linear infinite;margin:auto;box-shadow:0 0 25px #9b77ff33}
+.cloud-save-progress{height:5px;background:#2b304a;border-radius:20px;overflow:hidden}.cloud-save-progress span{display:block;width:35%;height:100%;background:linear-gradient(90deg,#8b6cff,#38d9ef);border-radius:20px;animation:cloudSaveMove 1.3s ease-in-out infinite alternate}
+@keyframes cloudSaveSpin{to{transform:rotate(360deg)}}@keyframes cloudSaveMove{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+@media(prefers-reduced-motion:reduce){.cloud-save-spinner,.cloud-save-progress span{animation:none}}
