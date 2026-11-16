@@ -226,3 +226,22 @@
 .player-info{display:flex;flex-direction:column;min-width:0;flex:1}.player-info strong{overflow:hidden;text-overflow:ellipsis}.player-info small{color:#9ba9c3}
 .player-pick{color:#b5a0ff;font-size:12px}.player-selected{color:#85e4c6;margin:8px 0}
 #tradeSearch{width:100%}
+
+/* v34: trade inventory cards and crafting roulette */
+.trade-picker{margin:12px 0 20px;min-width:0}.trade-picker-title{font-size:13px;color:#aab6d1;margin-bottom:9px;font-weight:700}
+.trade-picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:9px;max-height:290px;overflow:auto;padding:3px}
+.trade-card-choice{cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-width:0;padding:12px 7px;background:#151b2d;border:1px solid #30384f;border-radius:13px;text-align:center;position:relative;transition:background .2s,border-color .2s,transform .2s}
+.trade-card-choice input{position:absolute;opacity:0;pointer-events:none}.trade-card-choice:has(input:checked){background:#292148;border:2px solid #a78bfa;box-shadow:0 0 16px #7c58e32c;transform:translateY(-2px)}
+.trade-card-choice:has(input:checked):after{content:"✓";position:absolute;right:7px;top:5px;font-weight:900;color:#b9a3ff}
+.trade-card-art{font-size:34px;line-height:1.4}.trade-card-choice strong{font-size:12px;line-height:1.25;overflow-wrap:anywhere}.trade-card-choice small{font-size:10px;color:#a8b5ce}
+.craft-risk-head{display:flex;justify-content:space-between;gap:12px;width:min(360px,100%);font-size:13px}.craft-risk-head strong{color:#f4acbd}
+.craft-risk-bar{height:7px;border-radius:20px;background:#20283c;width:min(360px,100%);overflow:hidden}.craft-risk-bar span{display:block;height:100%;background:linear-gradient(90deg,#f8bd70,#ee547b);border-radius:20px}
+.craft-roulette-button{display:flex;flex-direction:column;align-items:center;gap:16px}
+.craft-roulette{--chance:20%;width:min(260px,72vw);height:min(260px,72vw);display:grid;place-items:center;position:relative;border-radius:50%;background:conic-gradient(#f17d95 0 var(--chance),#68c7e5 var(--chance) 100%);box-shadow:0 0 0 8px #20233b,0 0 35px #8e64e433;border:5px solid #242a46;transition:filter .2s}
+.craft-roulette:before{content:"";position:absolute;inset:13px;border:2px dashed #ffffff55;border-radius:50%}
+.craft-roulette-center{width:57%;height:57%;border-radius:50%;background:#151b30;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:54px;box-shadow:0 3px 20px #0008;z-index:1}
+.craft-roulette-center small{font-size:12px;color:#f5a9bb}.craft-roulette-pointer{position:absolute;top:-18px;left:50%;transform:translateX(-50%);color:#fff;z-index:2;font-size:24px;text-shadow:0 2px 7px #000}
+.craft-roulette-spinning{animation:craftRouletteSpin 2.4s cubic-bezier(.15,.75,.13,1) forwards}
+@keyframes craftRouletteSpin{from{transform:rotate(0)}to{transform:rotate(1800deg)}}
+@media(max-width:600px){.trade-picker-grid{grid-template-columns:repeat(3,minmax(0,1fr));max-height:270px}.trade-card-art{font-size:27px}.trade-card-choice{padding:10px 5px}}
+@media(prefers-reduced-motion:reduce){.craft-roulette-spinning{animation:none}}
