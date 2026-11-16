@@ -116,7 +116,36 @@ function syncLeaderboard(u){
  const data={nick:String(u.nick||"Collector").slice(0,20),xp:Math.max(0,Math.floor(Number(u.xp)||0)),opens:Math.max(0,Math.floor(Number(u.opens)||0)),updatedAt:serverTimestamp()};
  leaderboardSync=leaderboardSync.catch(()=>{}).then(()=>setDoc(doc(db,"leaderboard",uid),data)).catch(e=>console.warn("Leaderboard sync:",e));
 }
-function demoWrite(u){localStorage.setItem(demoKey(),JSON.stringify(u));syncLeaderboard(u)}
+let cloudSync=Promise.resolve();
+let cloudReady=false;
+function cloudSnapshot(u){
+ const {operations,...state}=u;
+ return {...state,operations:{},uid:current.uid};
+}
+function demoWrite(u){
+ localStorage.setItem(demoKey(),JSON.stringify(u));
+ syncLeaderboard(u);
+ if(!cloudReady||!db||!current||!verified())return;
+ const uid=current.uid,snapshot=cloudSnapshot(u);
+ cloudSync=cloudSync.catch(()=>{}).then(()=>setDoc(doc(db,"gameProfiles",uid),{state:snapshot,updatedAt:serverTimestamp()})).catch(e=>{console.warn("[VIDNESD] Cloud save failed",e);toast("Не удалось сохранить прогресс в облаке")});
+}
+async function restoreCloudProgress(){
+ if(!db||!current||!verified())return;
+ const uid=current.uid,remote=doc(db,"gameProfiles",uid),local=demoRead();
+ try{
+  const snapshot=await getDoc(remote);
+  if(snapshot.exists()){
+   const state=snapshot.data().state;
+   if(state&&state.uid===uid&&state.inventory&&typeof state.balance==="number"){
+    const merged={...state,operations:local?.operations||{}};
+    localStorage.setItem(demoKey(),JSON.stringify(merged));
+   }
+  }else if(local){
+   await setDoc(remote,{state:cloudSnapshot(local),updatedAt:serverTimestamp()});
+  }
+  cloudReady=true;
+ }catch(e){cloudReady=false;console.warn("[VIDNESD] Cloud restore failed",e);toast("Облачный прогресс недоступен. Проверь Firestore Rules")}
+}
 async function call(name,data={}){
  if(!verified())throw Error("Подтверди электронную почту");
  let u=demoRead();
@@ -361,7 +390,7 @@ function renderCraft(){
 }
 function authModal(mode="login"){show('<h2>'+(mode==="register"?"Создать аккаунт":mode==="reset"?"Восстановить пароль":"Войти в VIDNESD")+'</h2><form class="form" id="authForm"><label>Электронная почта<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>'+(mode==="reset"?'':'<label>Пароль (не менее 6 символов)<input type="password" name="password" minlength="6" required autocomplete="'+(mode==="register"?"new-password":"current-password")+'"></label>')+'<button class="primary" type="submit">'+(mode==="register"?"Зарегистрироваться":mode==="reset"?"Отправить письмо":"Войти")+'</button><button type="button" class="link" id="switch">'+(mode==="register"?"Уже есть аккаунт? Войти":"Создать аккаунт")+'</button><button type="button" class="link" id="reset">Забыли пароль?</button></form>');$("#switch").onclick=()=>authModal(mode==="register"?"login":"register");$("#reset").onclick=()=>authModal("reset");$("#authForm").onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);lock(async()=>{const email=fd.get("email"),password=fd.get("password");if(mode==="reset"){await sendPasswordResetEmail(auth,email);toast("Письмо отправлено");close();return}if(mode==="register"){const cred=await createUserWithEmailAndPassword(auth,email,password);await sendEmailVerification(cred.user);toast("Проверь почту и подтверди адрес");verifyModal();return}await signInWithEmailAndPassword(auth,email,password);close()})}}
 function verifyModal(){show('<h2>✉️ Подтверди почту</h2><p>Мы отправили письмо на '+escape(current?.email||"твою почту")+'. Открой ссылку в письме, затем нажми кнопку ниже.</p><div class="actions"><button class="primary" id="check">Проверить подтверждение</button><button class="secondary" id="resend">Отправить повторно</button><button class="secondary" id="verifyLogout">Выйти из аккаунта</button></div>');$("#check").onclick=()=>lock(async()=>{if(!await refreshVerification(current))throw Error("Не удалось обновить статус почты. Выйди и войди снова после подтверждения адреса.");try{await bootstrap()}catch(e){throw Error("Загрузка профиля: "+(e.code||e.message||e))}close()});$("#resend").onclick=()=>lock(async()=>{await sendEmailVerification(current);toast("Письмо отправлено")});$("#verifyLogout").onclick=()=>$("#authBtn").click()}
-async function bootstrap(){const data=await call("bootstrap");user=data.user;cases=data.cases;cards=data.cards;quests=data.quests;weights=data.weights;syncLeaderboard(user);try{const p=await getDoc(doc(db,"tradeProfiles",current.uid));if(p.exists()){user.nick=p.data().nick;demoWrite(user)}else{page="profile";toast("Укажи уникальный ник в профиле для поиска и обменов")}}catch(e){console.warn("Nickname profile unavailable",e)}render()}
+async function bootstrap(){cloudReady=false;await restoreCloudProgress();const data=await call("bootstrap");user=data.user;cases=data.cases;cards=data.cards;quests=data.quests;weights=data.weights;syncLeaderboard(user);try{const p=await getDoc(doc(db,"tradeProfiles",current.uid));if(p.exists()){user.nick=p.data().nick;demoWrite(user)}else{page="profile";toast("Укажи уникальный ник в профиле для поиска и обменов")}}catch(e){console.warn("Nickname profile unavailable",e)}render()}
 async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.balance=r.balance;if(r.nextAt)user.lastFreeVC=r.nextAt-20*60*1000;render();toast("Получено +"+fmt(r.reward)+" VC!")})}
 async function daily(){await lock(async()=>{const r=await call("claimDaily");user.balance=r.balance;user.lastDaily=r.lastDaily;toast("Получено +150 VC");render();confetti()})}
 async function claim(id){await lock(async()=>{const r=await call("claimQuest",{questId:id});user.balance=r.balance;user.claimed=r.claimed;toast("Награда +"+r.reward+" VC");render();confetti()})}
@@ -556,5 +585,5 @@ async function openCase(id){
  })
 }
 
-try{if(firebaseConfig.apiKey==="REPLACE_ME"||firebaseConfig.appId==="REPLACE_ME")throw Error("Firebase не настроен. Заполни firebase-config.js из Firebase Console.");const firebase=initializeApp(firebaseConfig);auth=getAuth(firebase);db=getFirestore(firebase);functions=null;onAuthStateChanged(auth,async u=>{current=u;user=null;render();if(!u){close();return}if(u){if(!verified()){await refreshVerification(u)}if(!verified()){verifyModal();return}try{await bootstrap();close()}catch(e){err(e)}}})}catch(e){err(e);app.innerHTML='<div class="empty"><h2>Подключение Firebase</h2><p>'+escape(e.message)+'</p><p>Укажи параметры проекта casespin-web в файле firebase-config.js.</p></div>'}
+try{if(firebaseConfig.apiKey==="REPLACE_ME"||firebaseConfig.appId==="REPLACE_ME")throw Error("Firebase не настроен. Заполни firebase-config.js из Firebase Console.");const firebase=initializeApp(firebaseConfig);auth=getAuth(firebase);db=getFirestore(firebase);functions=null;onAuthStateChanged(auth,async u=>{cloudReady=false;current=u;user=null;render();if(!u){close();return}if(u){if(!verified()){await refreshVerification(u)}if(!verified()){verifyModal();return}try{await bootstrap();close()}catch(e){err(e)}}})}catch(e){err(e);app.innerHTML='<div class="empty"><h2>Подключение Firebase</h2><p>'+escape(e.message)+'</p><p>Укажи параметры проекта casespin-web в файле firebase-config.js.</p></div>'}
 render();
