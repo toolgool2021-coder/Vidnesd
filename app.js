@@ -164,8 +164,11 @@ async function call(name,data={}){
  throw Error("Неизвестная операция")
 }
 const lock=async fn=>{if(busy)return;busy=true;document.body.classList.add("loading");try{await fn()}catch(e){err(e)}finally{busy=false;document.body.classList.remove("loading")}};
-const verified=()=>!!current?.emailVerified || !!current?._demoEmailVerified;
-async function refreshVerification(u){try{await reload(u);if(u.emailVerified){u._demoEmailVerified=true;return true}}catch(e){console.warn("[VIDNESD] Firebase account reload failed",e)}try{const t=await getIdTokenResult(u,true);if(t.claims.email_verified===true){u._demoEmailVerified=true;return true}}catch(e){console.warn("[VIDNESD] Firebase token refresh failed",e)}return verified()}
+const verified=()=>current?.emailVerified===true;
+async function refreshVerification(u){
+ try{await reload(u);await u.getIdToken(true);return u.emailVerified===true}
+ catch(e){console.warn("[VIDNESD] Email verification refresh failed",e);return false}
+}
 function show(html){body.innerHTML=html;modal.classList.remove("hidden")}
 function close(){modal.classList.add("hidden");body.innerHTML=""}
 $("#authBtn").onclick=()=>{if(current){if(!auth)return toast("Авторизация ещё загружается");lock(async()=>{await signOut(auth);current=null;user=null;page="home";close();render();toast("Вы вышли из аккаунта")})}else if(auth)authModal();else toast("Подключение к Firebase ещё не завершено")};
@@ -184,7 +187,7 @@ if(page==="craft"){renderCraft();return}
 if(page==="upgrade"){renderUpgrade();return}
 if(page==="quests"){app.innerHTML='<div class="eyebrow">REWARDS</div><h1>Задания</h1><p>Получай бесплатные VC за достижения и активность.</p>'+quests.map(q=>{const val=user[q.field]||0,done=user.claimed?.[q.id];return '<div class="quest"><div><strong>'+escape(q.name)+'</strong><span class="muted">'+Math.min(val,q.target)+' / '+q.target+' · +'+q.reward+' VC</span></div><button class="'+(done?'secondary':'primary')+' claim" data-id="'+q.id+'" '+(done||val<q.target?'disabled':'')+'>'+(done?'Получено':val>=q.target?'Забрать':'В процессе')+'</button></div>'}).join("")}
 if(page==="profile"){app.innerHTML='<div class="eyebrow">PLAYER PROFILE</div><h1>◈ '+escape(user.nick)+'</h1><p>Подтверждённая почта: '+escape(current.email)+'</p><form id="nickForm" class="form"><label>Твой уникальный ник (3–20 символов, латиница, цифры, _)<input name="nick" required minlength="3" maxlength="20" value="'+escape(user.nick||'')+'"></label><button class="primary" type="submit">Сохранить ник</button></form>'+stats()+'<h2>Достижения</h2><div class="grid">'+[{t:"Первый кейс",n:1},{t:"Коллекционер",n:10},{t:"Мастер кейсов",n:50},{t:"Легенда",n:100}].map(x=>'<div class="stat"><b>'+(user.opens>=x.n?'🏆':'🔒')+'</b>'+x.t+'<p>Открытий: '+x.n+'</p></div>').join("")+'</div>'}
-if(page==="leaders"){app.innerHTML='<div class="eyebrow">TOP COLLECTORS</div><h1>Лидерборд</h1><p>Онлайн-рейтинг недоступен в демонстрационном режиме Spark.</p><div id="leaders">Прогресс хранится только в этом браузере.</div>';loadLeaders()}
+if(page==="leaders"){app.innerHTML='<div class="eyebrow">TOP COLLECTORS</div><h1>Лидерборд VIDNESD</h1><p>Глобальный рейтинг по XP и открытиям. В таблицу попадают только подтверждённые сервером результаты, а не данные из браузера.</p><div class="stats"><div class="stat"><span class="muted">Твой XP (локально)</span><b>'+fmt(user.xp)+'</b></div><div class="stat"><span class="muted">Твои открытия (локально)</span><b>'+fmt(user.opens)+'</b></div></div><div class="actions"><button class="secondary" id="sortXp">По XP</button><button class="secondary" id="sortOpens">По открытиям</button></div><div id="leaders">Загружаем рейтинг...</div>';$("#sortXp").onclick=()=>loadLeaders("xp");$("#sortOpens").onclick=()=>loadLeaders("opens");loadLeaders("xp")}
 bind();if(page==="profile"){$("#nickForm").onsubmit=e=>{e.preventDefault();lock(async()=>{await saveNickname(new FormData(e.target).get("nick"));toast("Ник сохранён");render()})};const showcase=$("#editShowcase");if(showcase)showcase.onclick=editShowcase}}
 function bind(){document.querySelectorAll(".open").forEach(b=>b.onclick=()=>openCase(b.dataset.id));document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id));document.querySelectorAll(".claim").forEach(b=>b.onclick=()=>claim(b.dataset.id));document.querySelectorAll(".daily").forEach(b=>b.onclick=daily);document.querySelectorAll(".free-vc").forEach(b=>b.onclick=freeVC);document.querySelectorAll(".go").forEach(b=>b.onclick=()=>{page=b.dataset.go;render()})}
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});
@@ -282,7 +285,15 @@ async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.b
 async function daily(){await lock(async()=>{const r=await call("claimDaily");user.balance=r.balance;user.lastDaily=r.lastDaily;toast("Получено +150 VC");render();confetti()})}
 async function claim(id){await lock(async()=>{const r=await call("claimQuest",{questId:id});user.balance=r.balance;user.claimed=r.claimed;toast("Награда +"+r.reward+" VC");render();confetti()})}
 async function sell(id){await lock(async()=>{const r=await call("sellCard",{cardId:id});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;toast("Карточка продана");render()})}
-async function loadLeaders(){return;try{const r=await call("leaderboard");const el=$("#leaders");if(!el)return;el.innerHTML=r.leaders.length?r.leaders.map((x,i)=>'<div class="leader"><span><b>'+(i+1)+'.</b> '+escape(x.nick)+'</span><span>'+fmt(x.xp)+' XP</span></div>').join(""):'Пока нет участников'}catch(e){err(e)}}
+async function loadLeaders(sort="xp"){
+ const el=$("#leaders");if(!el||!db)return;
+ try{
+  const snapshot=await getDocs(query(collection(db,"leaderboard"),limit(100)));
+  if(page!=="leaders")return;
+  const leaders=snapshot.docs.map(d=>d.data()).filter(x=>typeof x.nick==="string"&&Number.isSafeInteger(x.xp)&&x.xp>=0&&Number.isSafeInteger(x.opens)&&x.opens>=0).sort((a,b)=>b[sort]-a[sort]||b.xp-a.xp).slice(0,50);
+  el.innerHTML=leaders.length?'<p>Топ '+leaders.length+' игроков · '+(sort==="xp"?"по XP":"по открытиям")+'</p>'+leaders.map((x,i)=>'<div class="leader"><span><b>'+(i+1)+'.</b> '+escape(x.nick)+'</span><span>'+fmt(x.xp)+' XP · '+fmt(x.opens)+' открытий</span></div>').join(""):'<div class="empty"><h3>Пока нет подтверждённых результатов</h3><p>Игровой прогресс сейчас хранится локально. Для честного общего рейтинга потребуется серверная запись результатов. Пустой рейтинг не означает, что игроков нет.</p></div>';
+ }catch(e){if(page==="leaders")el.textContent="Не удалось загрузить рейтинг: "+(e.code||e.message)}
+}
 function confetti(){if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let openingStyle="roulette",upgradeSelected=[],upgradeTarget="",craftSelected=[];
