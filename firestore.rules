@@ -76,7 +76,8 @@ service cloud.firestore {
         && request.resource.data.uid == uid
         && request.resource.data.nick is string
         && request.resource.data.nick.matches('[A-Za-z0-9_]{3,20}')
-        && request.resource.data.nickLower == request.resource.data.nick.lower()
+        && request.resource.data.nickLower is string
+        && request.resource.data.nickLower.matches('[a-z0-9_]{3,20}')
         && request.resource.data.updatedAt == request.time
         && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickLower)).data.uid == uid;
       allow delete: if false;
