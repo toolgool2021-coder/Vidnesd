@@ -26,7 +26,19 @@ service cloud.firestore {
     // Public leaderboard snapshot; clients cannot forge rankings.
     match /leaderboard/{uid} {
       allow read: if true;
-      allow write: if false;
+      allow create, update: if isSelf(uid)
+        && request.resource.data.keys().hasOnly(['nick','xp','opens','updatedAt'])
+        && request.resource.data.nick is string
+        && request.resource.data.nick.size() >= 1
+        && request.resource.data.nick.size() <= 20
+        && request.resource.data.xp is int
+        && request.resource.data.xp >= 0
+        && request.resource.data.xp <= 1000000000
+        && request.resource.data.opens is int
+        && request.resource.data.opens >= 0
+        && request.resource.data.opens <= 1000000000
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
     }
 
     // Public profile/showcase: readable, but cannot be forged client-side.
