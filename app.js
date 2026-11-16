@@ -2,7 +2,7 @@ import {initializeApp} from "https://www.gstatic.com/firebasejs/11.10.0/firebase
 import {getAuth,createUserWithEmailAndPassword,signInWithEmailAndPassword,signOut,sendEmailVerification,sendPasswordResetEmail,onAuthStateChanged,reload,getIdTokenResult} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
 import {getFunctions,httpsCallable,connectFunctionsEmulator} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
 import {firebaseConfig} from "./firebase-config.js";
-import {getFirestore,collection,doc,addDoc,getDocs,getDoc,setDoc,query,where,updateDoc,serverTimestamp,limit} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import {getFirestore,collection,doc,addDoc,getDocs,getDoc,setDoc,runTransaction,query,where,updateDoc,serverTimestamp,limit} from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 const $=s=>document.querySelector(s),app=$("#app"),modal=$("#modal"),body=$("#modalBody");
 let auth=null,functions=null,db=null,current=null,user=null,cases=[],cards=[],quests=[],weights=[],page="home",busy=false;
 const fmt=n=>Number(n||0).toLocaleString("ru-RU");
@@ -183,9 +183,9 @@ if(page==="workshop"){renderWorkshop();return}
 if(page==="craft"){renderCraft();return}
 if(page==="upgrade"){renderUpgrade();return}
 if(page==="quests"){app.innerHTML='<div class="eyebrow">REWARDS</div><h1>Задания</h1><p>Получай бесплатные VC за достижения и активность.</p>'+quests.map(q=>{const val=user[q.field]||0,done=user.claimed?.[q.id];return '<div class="quest"><div><strong>'+escape(q.name)+'</strong><span class="muted">'+Math.min(val,q.target)+' / '+q.target+' · +'+q.reward+' VC</span></div><button class="'+(done?'secondary':'primary')+' claim" data-id="'+q.id+'" '+(done||val<q.target?'disabled':'')+'>'+(done?'Получено':val>=q.target?'Забрать':'В процессе')+'</button></div>'}).join("")}
-if(page==="profile"){app.innerHTML='<div class="eyebrow">PLAYER PROFILE</div><h1>◈ '+escape(user.nick)+'</h1><p>Подтверждённая почта: '+escape(current.email)+'</p>'+stats()+'<h2>Достижения</h2><div class="grid">'+[{t:"Первый кейс",n:1},{t:"Коллекционер",n:10},{t:"Мастер кейсов",n:50},{t:"Легенда",n:100}].map(x=>'<div class="stat"><b>'+(user.opens>=x.n?'🏆':'🔒')+'</b>'+x.t+'<p>Открытий: '+x.n+'</p></div>').join("")+'</div>'}
+if(page==="profile"){app.innerHTML='<div class="eyebrow">PLAYER PROFILE</div><h1>◈ '+escape(user.nick)+'</h1><p>Подтверждённая почта: '+escape(current.email)+'</p><form id="nickForm" class="form"><label>Твой уникальный ник (3–20 символов, латиница, цифры, _)<input name="nick" required minlength="3" maxlength="20" value="'+escape(user.nick||'')+'"></label><button class="primary" type="submit">Сохранить ник</button></form>'+stats()+'<h2>Достижения</h2><div class="grid">'+[{t:"Первый кейс",n:1},{t:"Коллекционер",n:10},{t:"Мастер кейсов",n:50},{t:"Легенда",n:100}].map(x=>'<div class="stat"><b>'+(user.opens>=x.n?'🏆':'🔒')+'</b>'+x.t+'<p>Открытий: '+x.n+'</p></div>').join("")+'</div>'}
 if(page==="leaders"){app.innerHTML='<div class="eyebrow">TOP COLLECTORS</div><h1>Лидерборд</h1><p>Онлайн-рейтинг недоступен в демонстрационном режиме Spark.</p><div id="leaders">Прогресс хранится только в этом браузере.</div>';loadLeaders()}
-bind();if(page==="profile")$("#editShowcase").onclick=editShowcase}
+bind();if(page==="profile"){$("#nickForm").onsubmit=e=>{e.preventDefault();lock(async()=>{await saveNickname(new FormData(e.target).get("nick"));toast("Ник сохранён");render()})};const showcase=$("#editShowcase");if(showcase)showcase.onclick=editShowcase}}
 function bind(){document.querySelectorAll(".open").forEach(b=>b.onclick=()=>openCase(b.dataset.id));document.querySelectorAll(".sell").forEach(b=>b.onclick=()=>sell(b.dataset.id));document.querySelectorAll(".claim").forEach(b=>b.onclick=()=>claim(b.dataset.id));document.querySelectorAll(".daily").forEach(b=>b.onclick=daily);document.querySelectorAll(".free-vc").forEach(b=>b.onclick=freeVC);document.querySelectorAll(".go").forEach(b=>b.onclick=()=>{page=b.dataset.go;render()})}
 document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>{page=b.dataset.page;render()});
 async function handleAuthButton(){if(!auth){toast("Авторизация ещё загружается. Повтори попытку.");return}if(!current){authModal();return}await lock(async()=>{await signOut(auth);current=null;user=null;page="home";close();render();toast("Вы вышли из аккаунта")})}
@@ -196,11 +196,26 @@ function editShowcase(){
  show('<h2>Витрина коллекции</h2><p>Выбери не больше 5 карточек. В текущей версии витрина хранится в этом браузере.</p><div class="showcase-picker">'+owned.map(c=>'<label><input type="checkbox" data-showcase="'+c.id+'" '+(chosen.has(c.id)?"checked":"")+'><span>'+c.emoji+' '+escape(c.name)+'</span></label>').join("")+'</div><button class="primary" id="saveShowcase">Сохранить</button>');
  $("#saveShowcase").onclick=()=>lock(async()=>{const ids=[...document.querySelectorAll("[data-showcase]:checked")].map(x=>x.dataset.showcase);const r=await call("saveShowcase",{ids});user.showcase=r.showcase;close();render();toast("Витрина сохранена")})
 }
-async function publishTradeProfile(){
- if(!db||!current||!user)return;
- const nick=String(user.nick||"Collector").slice(0,20);
- await setDoc(doc(db,"tradeProfiles",current.uid),{uid:current.uid,nick,nickLower:nick.toLowerCase(),updatedAt:serverTimestamp()});
+const validNick=n=>/^[a-zA-Z0-9_]{3,20}$/.test(n);
+async function saveNickname(raw){
+ const nick=String(raw||"").trim(),nickLower=nick.toLowerCase();
+ if(!validNick(nick))throw Error("Ник: 3–20 символов, латинские буквы, цифры и _");
+ if(!db)throw Error("Firestore не подключён");
+ const profile=doc(db,"tradeProfiles",current.uid),reservation=doc(db,"nicknames",nickLower);
+ await runTransaction(db,async tx=>{
+  const [oldProfile,existing]=await Promise.all([tx.get(profile),tx.get(reservation)]);
+  if(existing.exists()&&existing.data().uid!==current.uid)throw Error("Ник уже занят");
+  const old=oldProfile.exists()?oldProfile.data().nickLower:null;
+  let oldRef=null;
+  if(old&&old!==nickLower){oldRef=doc(db,"nicknames",old);await tx.get(oldRef)}
+  if(!existing.exists())tx.set(reservation,{uid:current.uid});
+  if(oldRef)tx.delete(oldRef);
+  tx.set(profile,{uid:current.uid,nick,nickLower,updatedAt:serverTimestamp()});
+ });
+ user.nick=nick;demoWrite(user);
+ return nick;
 }
+async function publishTradeProfile(){return saveNickname(user.nick)}
 async function renderTrades(){
  const owned=cards.filter(c=>user.inventory?.[c.id]>0);
  const options='<option value="">Без карточки</option>'+owned.map(c=>'<option value="'+escape(c.id)+'">'+escape(c.name)+' · '+fmt(c.value)+' VC</option>').join("");
@@ -262,7 +277,7 @@ function renderCraft(){
 }
 function authModal(mode="login"){show('<h2>'+(mode==="register"?"Создать аккаунт":mode==="reset"?"Восстановить пароль":"Войти в VIDNESD")+'</h2><form class="form" id="authForm"><label>Электронная почта<input type="email" name="email" required autocomplete="email" placeholder="you@example.com"></label>'+(mode==="reset"?'':'<label>Пароль (не менее 6 символов)<input type="password" name="password" minlength="6" required autocomplete="'+(mode==="register"?"new-password":"current-password")+'"></label>')+'<button class="primary" type="submit">'+(mode==="register"?"Зарегистрироваться":mode==="reset"?"Отправить письмо":"Войти")+'</button><button type="button" class="link" id="switch">'+(mode==="register"?"Уже есть аккаунт? Войти":"Создать аккаунт")+'</button><button type="button" class="link" id="reset">Забыли пароль?</button></form>');$("#switch").onclick=()=>authModal(mode==="register"?"login":"register");$("#reset").onclick=()=>authModal("reset");$("#authForm").onsubmit=e=>{e.preventDefault();const fd=new FormData(e.target);lock(async()=>{const email=fd.get("email"),password=fd.get("password");if(mode==="reset"){await sendPasswordResetEmail(auth,email);toast("Письмо отправлено");close();return}if(mode==="register"){const cred=await createUserWithEmailAndPassword(auth,email,password);await sendEmailVerification(cred.user);toast("Проверь почту и подтверди адрес");verifyModal();return}await signInWithEmailAndPassword(auth,email,password);close()})}}
 function verifyModal(){show('<h2>✉️ Подтверди почту</h2><p>Мы отправили письмо на '+escape(current?.email||"твою почту")+'. Открой ссылку в письме, затем нажми кнопку ниже.</p><div class="actions"><button class="primary" id="check">Проверить подтверждение</button><button class="secondary" id="resend">Отправить повторно</button><button class="secondary" id="verifyLogout">Выйти из аккаунта</button></div>');$("#check").onclick=()=>lock(async()=>{if(!await refreshVerification(current))throw Error("Не удалось обновить статус почты. Выйди и войди снова после подтверждения адреса.");try{await bootstrap()}catch(e){throw Error("Загрузка профиля: "+(e.code||e.message||e))}close()});$("#resend").onclick=()=>lock(async()=>{await sendEmailVerification(current);toast("Письмо отправлено")});$("#verifyLogout").onclick=()=>$("#authBtn").click()}
-async function bootstrap(){const data=await call("bootstrap");user=data.user;cases=data.cases;cards=data.cards;quests=data.quests;weights=data.weights;render()}
+async function bootstrap(){const data=await call("bootstrap");user=data.user;cases=data.cases;cards=data.cards;quests=data.quests;weights=data.weights;try{const p=await getDoc(doc(db,"tradeProfiles",current.uid));if(p.exists()){user.nick=p.data().nick;demoWrite(user)}else{page="profile";toast("Укажи уникальный ник в профиле для поиска и обменов")}}catch(e){console.warn("Nickname profile unavailable",e)}render()}
 async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.balance=r.balance;if(r.nextAt)user.lastFreeVC=r.nextAt-20*60*1000;render();toast("Получено +"+fmt(r.reward)+" VC!")})}
 async function daily(){await lock(async()=>{const r=await call("claimDaily");user.balance=r.balance;user.lastDaily=r.lastDaily;toast("Получено +150 VC");render();confetti()})}
 async function claim(id){await lock(async()=>{const r=await call("claimQuest",{questId:id});user.balance=r.balance;user.claimed=r.claimed;toast("Награда +"+r.reward+" VC");render();confetti()})}
