@@ -118,6 +118,9 @@ function syncLeaderboard(u){
 }
 let cloudSync=Promise.resolve();
 let cloudReady=false;
+let cloudDirty=false;
+let cloudSaveError=null;
+let cloudSaving=false;
 function cloudSnapshot(u){
  const {operations,...state}=u;
  return {...state,operations:{},uid:current.uid};
@@ -127,7 +130,8 @@ function demoWrite(u){
  syncLeaderboard(u);
  if(!cloudReady||!db||!current||!verified())return;
  const uid=current.uid,snapshot=cloudSnapshot(u);
- cloudSync=cloudSync.catch(()=>{}).then(()=>setDoc(doc(db,"gameProfiles",uid),{state:snapshot,updatedAt:serverTimestamp()})).catch(e=>{console.warn("[VIDNESD] Cloud save failed",e);toast("Не удалось сохранить прогресс в облаке")});
+ cloudDirty=true;
+ cloudSync=cloudSync.catch(()=>{}).then(()=>setDoc(doc(db,"gameProfiles",uid),{state:snapshot,updatedAt:serverTimestamp()})).then(()=>{cloudSaveError=null}).catch(e=>{cloudSaveError=e;console.warn("[VIDNESD] Cloud save failed",e)});
 }
 async function restoreCloudProgress(){
  if(!db||!current||!verified())return;
@@ -239,7 +243,22 @@ async function call(name,data={}){
  }
  throw Error("Неизвестная операция")
 }
-const lock=async fn=>{if(busy)return;busy=true;document.body.classList.add("loading");try{await fn()}catch(e){err(e)}finally{busy=false;document.body.classList.remove("loading")}};
+function saveOverlay(title="Сохраняем прогресс"){
+ let layer=document.getElementById("cloudSaveOverlay");
+ if(!layer){layer=document.createElement("div");layer.id="cloudSaveOverlay";layer.className="cloud-save-overlay";layer.setAttribute("role","status");layer.setAttribute("aria-live","polite");document.body.append(layer)}
+ layer.innerHTML='<div class="cloud-save-box"><div class="cloud-save-spinner"></div><h3>'+escape(title)+'</h3><p>Подождите, синхронизируем изменения с Firebase</p><div class="cloud-save-progress"><span></span></div></div>';
+ return layer;
+}
+async function waitCloudSave(title){
+ if(!cloudDirty)return;
+ cloudDirty=false;
+ if(!cloudReady){toast("Облачное сохранение недоступно. Данные остались на устройстве.");return}
+ const overlay=saveOverlay(title);
+ try{await cloudSync;if(cloudSaveError)throw cloudSaveError}
+ catch(e){throw Error("Не удалось сохранить в Firebase. Прогресс есть на устройстве, но ещё не синхронизирован: "+(e.code||e.message))}
+ finally{overlay.remove()}
+}
+const lock=async fn=>{if(busy)return;busy=true;cloudDirty=false;cloudSaveError=null;document.body.classList.add("loading");try{await fn();await waitCloudSave("Сохраняем изменения")}catch(e){err(e)}finally{busy=false;document.body.classList.remove("loading")}};
 const verified=()=>current?.emailVerified===true;
 async function refreshVerification(u){
  try{await reload(u);await u.getIdToken(true);return u.emailVerified===true}
@@ -398,7 +417,7 @@ async function bootstrap(){cloudReady=false;await restoreCloudProgress();const d
 async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.balance=r.balance;if(r.nextAt)user.lastFreeVC=r.nextAt-20*60*1000;render();toast("Получено +"+fmt(r.reward)+" VC!")})}
 async function daily(){await lock(async()=>{const r=await call("claimDaily");user.balance=r.balance;user.lastDaily=r.lastDaily;toast("Получено +150 VC");render();confetti()})}
 async function claim(id){await lock(async()=>{const r=await call("claimQuest",{questId:id});user.balance=r.balance;user.claimed=r.claimed;toast("Награда +"+r.reward+" VC");render();confetti()})}
-async function sell(id){await lock(async()=>{const r=await call("sellCard",{cardId:id});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;toast("Карточка продана");render()})}
+async function sell(id){await lock(async()=>{const r=await call("sellCard",{cardId:id});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;await waitCloudSave("Сохраняем продажу");toast("Карточка продана");render()})}
 let leaderboardRequestId=0;
 let leaderboardSort="xp";
 let leaderboardCache=[];
@@ -575,6 +594,7 @@ async function openCase(id){
   $("#startRoll").disabled=true;document.querySelectorAll("[data-style],[data-duration]").forEach(b=>b.disabled=true);
   const r=await call("openCase",{caseId:id,operationId:crypto.randomUUID()});
   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
+  await waitCloudSave("Сохраняем выпавший предмет");
   const area=$("#rollArea");if(!area)return;
   const duration=chosenDuration==="epic"?12500:chosenDuration==="long"?9500:7200;
   if(openingEffects){area.classList.add("vfx-running");area.style.setProperty("--vfx-duration",duration+"ms")}
