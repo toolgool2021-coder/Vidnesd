@@ -36,6 +36,22 @@ const SPECIAL_CASES=[
  ["Collector Elite","🪐",1900,[10,15,65,10],12,3900]
 ];
 DEMO_CASES.push(...SPECIAL_CASES.map(([name,emoji,price,odds,minValue,maxValue],i)=>({id:"case"+(64+i),name,emoji,price,tier:0,odds,minValue,maxValue,special:true})));
+// Expansion pack: themed cases with varied prices and rarity distributions.
+const EXPANSION_CASES=[
+ ["Midnight Metro","🚇",160,[82,15,2.7,.3]],["Botanical Lab","🪴",240,[78,18,3.5,.5]],
+ ["Clockwork City","⚙️",340,[72,22,5,1]],["Desert Mirage","🏜️",460,[66,26,7,1]],
+ ["Coral Sanctuary","🪸",560,[61,29,9,1]],["Digital Ruins","💾",690,[56,31,11,2]],
+ ["Storm Observatory","🌩️",810,[52,32,13,3]],["Frozen Harbor","🧊",930,[49,33,15,3]],
+ ["Emerald Jungle","🦎",1080,[45,34,17,4]],["Phantom Carnival","🎪",1230,[42,34,19,5]],
+ ["Neon Underworld","🛸",1380,[40,33,21,6]],["Crimson Citadel","🏯",1550,[37,34,22,7]],
+ ["Lost Archive","📖",1740,[34,33,25,8]],["Deep Ocean Vault","🐚",1930,[32,32,26,10]],
+ ["Solar Dominion","🌞",2160,[29,32,27,12]],["Astral Cathedral","⛪",2390,[26,30,29,15]],
+ ["Mechanical Eden","🦾",2650,[24,29,30,17]],["Twilight Throne","🪑",2890,[21,29,31,19]],
+ ["Dream Dimension","💭",3150,[19,27,32,22]],["Eclipse Protocol","🌒",3490,[17,25,33,25]],
+ ["Ancient Relics","🏺",410,[60,32,7,1]],["Lucky Circuit","🎰",750,[75,12,10,3]],
+ ["Void Emperor","🕳️",3750,[14,23,33,30]],["Last Universe","🌌",4400,[12,20,33,35]]
+];
+DEMO_CASES.push(...EXPANSION_CASES.map(([name,emoji,price,odds],i)=>({id:"case"+(76+i),name,emoji,price,tier:0,odds,special:true,minValue:12,maxValue:3900})));
 const DEMO_EMOJI=["🌙","☄️","🦊","🦋","🪐","🐉","🦄","🌸","🌊","⚡","💎","🔮","🧿","🦉","🐺","🦁","🌌","🔥","🍀","🌈","🦅","🐈","🪷","🧊","🌠","🎭","🪼","🦈","🌻","🎐","🧬","🛰️"];
 const DEMO_NAMES=["Moonlight","Comet","Fox Spirit","Nebula Wing","Saturn","Ancient Dragon","Unicorn","Sakura","Tidal","Thunder","Crystal","Oracle","Eye of Cosmos","Night Owl","Silver Wolf","Solar Lion","Galaxy","Phoenix","Lucky Clover","Prism","Sky Hunter","Starlit Cat","Lotus","Glacier","Starfall","Phantom","Deep Sea","Ocean King","Sunflower","Wind Chime","Genesis","Voyager"];
 const DEMO_RARITIES=["common","rare","epic","legendary"],DEMO_VALUES={common:25,rare:90,epic:350,legendary:1300};
@@ -53,6 +69,30 @@ DEMO_CARDS.push(...MORE_CARDS.map(([name,emoji],i)=>({id:"card"+(96+i),name,emoj
 // Each card has an individual value within its rarity, not a fixed tier price.
 const VALUE_BANDS={common:[12,75],rare:[85,260],epic:[290,990],legendary:[1050,3900]};
 for(let i=0;i<DEMO_CARDS.length;i++){const c=DEMO_CARDS[i],band=VALUE_BANDS[c.rarity],range=band[1]-band[0]+1;c.value=band[0]+((i*97+i*i*13+41)%range)}
+// Expansion pack: 64 collectible cards; stable IDs preserve existing inventories.
+const EXPANSION_CARDS=[
+ ["Moonlit Tram","🚋"],["Copper Sparrow","🐦"],["Ivy Automaton","🤖"],["Desert Glass","🏜️"],
+ ["Coral Crown","🪸"],["Circuit Orchid","🌺"],["Storm Telescope","🔭"],["Frozen Anchor","⚓"],
+ ["Jade Chameleon","🦎"],["Carnival Phantom","🎭"],["Neon Scorpion","🦂"],["Crimson Fortress","🏰"],
+ ["Forgotten Manuscript","📜"],["Abyssal Compass","🧭"],["Solar Monarch","👑"],["Astral Cathedral","⛪"],
+ ["Mechanical Lotus","🪷"],["Twilight Scepter","🪄"],["Dream Architect","🧑‍🚀"],["Eclipse Engine","⚙️"],
+ ["Ancient Amphora","🏺"],["Lucky Capacitor","🔋"],["Void Emperor","🌑"],["Universe Seed","🌱"],
+ ["Railway Ghost","👻"],["Emerald Beetle","🪲"],["Amber Circuit","💡"],["Mirage Falcon","🦅"],
+ ["Tidal Lantern","🏮"],["Quantum Orchid","🌷"],["Thunder Relic","⚡"],["Icebound Leviathan","🐋"],
+ ["Jungle Monolith","🗿"],["Masquerade Moon","🌙"],["Cyber Hydra","🐉"],["Scarlet Obelisk","🔺"],
+ ["Arcane Codex","📕"],["Oceanic Trident","🔱"],["Helios Crown","☀️"],["Celestial Harp","🎼"],
+ ["Clockwork Stag","🦌"],["Dusk Phoenix","🔥"],["Lucid Portal","🚪"],["Black Star Reactor","🌟"],
+ ["Sandstorm Rose","🌹"],["Fortune Dice","🎲"],["Null Serpent","🐍"],["Infinite Horizon","🌄"],
+ ["Subway Signal","🚦"],["Glass Firefly","✨"],["Copper Gear","⚙️"],["Dune Wanderer","🐪"],
+ ["Pearl Seahorse","🐠"],["Digital Lotus","💠"],["Lightning Fox","🦊"],["Polar Guardian","🐻‍❄️"],
+ ["Jade Panther","🐆"],["Spectral Carousel","🎠"],["Neon Samurai","🥷"],["Ruby Sentinel","🛡️"],
+ ["Eternal Chronicle","📚"],["Abyssal Kraken","🐙"],["Sunforge Dragon","🐲"],["Cosmic Sovereign","🪐"]
+];
+DEMO_CARDS.push(...EXPANSION_CARDS.map(([name,emoji],i)=>({id:"card"+(160+i),name,emoji,rarity:DEMO_RARITIES[i%4],value:0})));
+for(let i=160;i<DEMO_CARDS.length;i++){
+ const card=DEMO_CARDS[i],band=VALUE_BANDS[card.rarity];
+ card.value=band[0]+((i*131+i*i*17+79)%(band[1]-band[0]+1));
+}
 const DEMO_WEIGHTS=[[75,20,4.5,.5],[65,26,8,1],[53,32,13,2],[42,35,19,4]];
 function caseOdds(c){return c.odds||DEMO_WEIGHTS[c.tier]}
 function casePool(c,rarity){return DEMO_CARDS.filter(card=>card.rarity===rarity&&(!c.special||(card.value>=c.minValue&&card.value<=c.maxValue)))}
