@@ -45,18 +45,29 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Public opt-in nickname directory. Only owner of a profile may edit it.
+    // Unique nickname reservation; one owner per lowercase nickname.
+    match /nicknames/{nick} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn()
+        && nick.matches('[a-z0-9_]{3,20}')
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+    }
+
     match /tradeProfiles/{uid} {
       allow read: if signedIn();
       allow create, update: if isSelf(uid)
         && request.resource.data.keys().hasOnly(['uid','nick','nickLower','updatedAt'])
         && request.resource.data.uid == uid
         && request.resource.data.nick is string
-        && request.resource.data.nick.size() >= 1
-        && request.resource.data.nick.size() <= 20
+        && request.resource.data.nick.matches('[A-Za-z0-9_]{3,20}')
         && request.resource.data.nickLower == request.resource.data.nick.lower()
-        && request.resource.data.updatedAt == request.time;
-      allow delete: if isSelf(uid);
+        && request.resource.data.updatedAt == request.time
+        && getAfter(/databases/$(database)/documents/nicknames/$(request.resource.data.nickLower)).data.uid == uid;
+      allow delete: if false;
     }
 
     // Proposals are not actual asset transfers.
