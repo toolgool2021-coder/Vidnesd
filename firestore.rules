@@ -23,10 +23,32 @@ service cloud.firestore {
         && request.resource.data.balance <= 1000000000;
     }
 
+    // Owner-created virtual item catalog.
+    match /adminItems/{itemId} {
+      allow read: if signedIn();
+      allow create: if isOwner()
+        && itemId.matches('admin_[A-Za-z0-9_-]{20,}')
+        && request.resource.data.keys().hasOnly(['id','name','emoji','rarity','value','adminItem','creator'])
+        && request.resource.data.id == itemId
+        && request.resource.data.creator == request.auth.uid
+        && request.resource.data.adminItem == true
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.emoji is string
+        && request.resource.data.emoji.size() >= 1
+        && request.resource.data.emoji.size() <= 8
+        && request.resource.data.rarity in ['common','rare','epic','legendary']
+        && request.resource.data.value is int
+        && request.resource.data.value >= 1
+        && request.resource.data.value <= 100000000;
+      allow update, delete: if false;
+    }
+
     // Prototype account-based save. Client-writable: not anti-cheat secure.
     match /gameProfiles/{uid} {
-      allow read: if isSelf(uid);
-      allow create, update: if isSelf(uid)
+      allow read: if isSelf(uid) || isOwner();
+      allow create, update: if isOwner() || isSelf(uid)
         && request.resource.data.keys().hasOnly(['state','updatedAt'])
         && request.resource.data.state is map
         && request.resource.data.state.uid == uid
