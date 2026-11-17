@@ -254,3 +254,12 @@
 .cloud-save-progress{height:5px;background:#2b304a;border-radius:20px;overflow:hidden}.cloud-save-progress span{display:block;width:35%;height:100%;background:linear-gradient(90deg,#8b6cff,#38d9ef);border-radius:20px;animation:cloudSaveMove 1.3s ease-in-out infinite alternate}
 @keyframes cloudSaveSpin{to{transform:rotate(360deg)}}@keyframes cloudSaveMove{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
 @media(prefers-reduced-motion:reduce){.cloud-save-spinner,.cloud-save-progress span{animation:none}}
+
+/* v36 — fixed roulette, rotating needle like upgrade */
+.craft-roulette{transform:none!important;animation:none!important}
+.craft-roulette-needle{position:absolute;inset:0;z-index:3;transform:rotate(0deg);pointer-events:none}
+.craft-roulette-needle-tip{position:absolute;top:9px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top:22px solid #fff;filter:drop-shadow(0 2px 5px #0009)}
+.craft-roulette-needle-shaft{position:absolute;top:30px;left:calc(50% - 2px);width:4px;height:30px;border-radius:5px;background:linear-gradient(#fff,#ffffff00)}
+.craft-needle-spinning{animation:craftNeedleSpin 3.2s cubic-bezier(.12,.76,.12,1) forwards}
+@keyframes craftNeedleSpin{to{transform:rotate(var(--craft-end-angle))}}
+@media(prefers-reduced-motion:reduce){.craft-needle-spinning{animation:none;transform:rotate(var(--craft-end-angle))}}
