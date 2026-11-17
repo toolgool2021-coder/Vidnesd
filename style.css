@@ -263,3 +263,6 @@
 .craft-needle-spinning{animation:craftNeedleSpin 3.2s cubic-bezier(.12,.76,.12,1) forwards}
 @keyframes craftNeedleSpin{to{transform:rotate(var(--craft-end-angle))}}
 @media(prefers-reduced-motion:reduce){.craft-needle-spinning{animation:none;transform:rotate(var(--craft-end-angle))}}
+
+/* v37 owner inventory tools */
+.admin-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0}.admin-panel{min-width:0;padding:20px;border-radius:18px;border:1px solid #ffffff1d;background:#171d30}.admin-panel h2{margin-top:0}.admin-panel input,.admin-panel select{width:100%;box-sizing:border-box}@media(max-width:720px){.admin-layout{grid-template-columns:1fr}.admin-panel{padding:15px}}
