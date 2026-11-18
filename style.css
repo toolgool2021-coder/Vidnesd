@@ -567,3 +567,13 @@ body.design-v44 #toast .toast,body.design-v44 .toast{background:#20313c;color:#e
 .market-item small{display:block;opacity:.65;margin-top:5px}.market-art{font-size:36px}.market-item>p,.market-bottom{grid-column:1/-1}.market-item>p{font-size:12px;opacity:.65;margin:0}
 .market-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px}.market-bottom b{font-size:19px}
 @media(max-width:620px){.market-form{grid-template-columns:1fr}.market-panel{padding:14px}}
+
+.odds-panel{margin:16px 0 22px;padding:20px;border:1px solid rgba(150,170,205,.2);border-radius:18px;background:linear-gradient(145deg,rgba(125,145,185,.1),rgba(20,28,40,.05))}
+.odds-heading{font-size:12px;letter-spacing:.11em;text-transform:uppercase;font-weight:800;margin-bottom:14px;opacity:.85}
+.odds-bar{height:12px;display:flex;overflow:hidden;border-radius:99px;background:rgba(130,140,160,.16);gap:2px}
+.odds-fill{height:100%;min-width:0;transition:width .5s ease}
+.odds-fill.odds-0{background:#8c9baa}.odds-fill.odds-1{background:#54a8fa}.odds-fill.odds-2{background:#bd85ff}.odds-fill.odds-3{background:#f4c466}
+.odds-legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px 16px;margin-top:15px}
+.odds-line{display:flex;align-items:center;gap:8px;font-size:13px}.odds-line strong{margin-left:auto;font-variant-numeric:tabular-nums}
+.odds-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#8c9baa}.odds-line.odds-1 .odds-dot{background:#54a8fa}.odds-line.odds-2 .odds-dot{background:#bd85ff}.odds-line.odds-3 .odds-dot{background:#f4c466}
+@media(max-width:460px){.odds-panel{padding:14px}.odds-legend{grid-template-columns:1fr}}
