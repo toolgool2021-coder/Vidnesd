@@ -126,8 +126,9 @@ for(let i=160;i<DEMO_CARDS.length;i++){
  const card=DEMO_CARDS[i],band=VALUE_BANDS[card.rarity];
  card.value=band[0]+((i*131+i*i*17+79)%(band[1]-band[0]+1));
 }
-const DEMO_WEIGHTS=[[75,20,4.5,.5],[65,26,8,1],[53,32,13,2],[42,35,19,4]];
-function caseOdds(c){return c.odds||DEMO_WEIGHTS[c.tier]}
+const DEMO_WEIGHTS=[[88,10,1.8,.2],[83,13,3.6,.4],[76,18,5.3,.7],[68,23,8,1]];
+function caseOdds(c){return c.odds?c.odds.map((v,i)=>i===3?Math.min(v,1):v):DEMO_WEIGHTS[c.tier]||DEMO_WEIGHTS[0]}
+function oddsVisual(w){const names=["Обычная","Редкая","Эпическая","Легендарная"];return '<div class="odds-panel"><div class="odds-heading">Вероятности выпадения</div><div class="odds-bar">'+w.map((v,i)=>'<span class="odds-fill odds-'+i+'" style="width:'+v+'%"></span>').join("")+'</div><div class="odds-legend">'+w.map((v,i)=>'<div class="odds-line odds-'+i+'"><span class="odds-dot"></span><span>'+names[i]+'</span><strong>'+v+'%</strong></div>').join("")+'</div></div>'}
 function casePool(c,rarity){return DEMO_CARDS.filter(card=>card.rarity===rarity&&(!c.special||(card.value>=c.minValue&&card.value<=c.maxValue)))}
 function caseAvailable(c){return DEMO_RARITIES.flatMap((rarity,i)=>caseOdds(c)[i]>0?casePool(c,rarity):[])}
 function upgradeRewards(total){return DEMO_CARDS.filter(c=>c.value>total&&c.value<=total*4)}
@@ -848,7 +849,7 @@ async function runAutoUpgrade(){
 }
 async function openCase(id){
  const c=cases.find(x=>x.id===id);if(!c)return;const w=caseOdds(c);
- show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div>'+autoControls("cases",id)+'<div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
+ show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC</p>'+oddsVisual(w)+'<p>'+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div>'+autoControls("cases",id)+'<div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
