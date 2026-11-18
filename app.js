@@ -191,6 +191,45 @@ async function restoreCloudProgress(){
   cloudReady=true;
  }catch(e){cloudReady=false;console.warn("[VIDNESD] Cloud restore failed",e);toast("Облачный прогресс недоступен. Проверь Firestore Rules")}
 }
+async function openOwnedCaseTransaction(cs,operationId){
+ if(!cloudReady||!db)throw Error("Для открытия подаренного кейса требуется подключение Firebase");
+ await cloudSync;
+ const ref=doc(db,"gameProfiles",current.uid);
+ const outcome=await runTransaction(db,async tx=>{
+  const snap=await tx.get(ref);if(!snap.exists())throw Error("Облачный профиль не найден");
+  const state=structuredClone(snap.data().state);
+  if(state.uid!==current.uid)throw Error("Неверный владелец");
+  if(Number(state.caseInventory?.[cs.id]||0)<1)throw Error("Кейс уже использован или отсутствует");
+  let card;
+  if(cs.adminCase){
+   const options=cs.drops.map(x=>({...x,card:cards.find(c=>c.id===x.cardId)})).filter(x=>x.card&&x.chance>0);
+   if(!options.length)throw Error("Кейс не содержит доступных предметов");
+   const roll=randomInt(1000000)/10000;let total=0;
+   for(const option of options){total+=option.chance;if(roll<total){card=option.card;break}}
+   card ||= options[options.length-1].card;
+  }else{
+   const roll=randomInt(1000000)/10000,w=caseOdds(cs);let total=0,rarity=w.length-1;
+   for(let i=0;i<w.length;i++){total+=w[i];if(roll<total){rarity=i;break}}
+   const pool=casePool(cs,DEMO_RARITIES[rarity]);
+   if(!pool.length)throw Error("Пул наград недоступен");
+   card=pool[randomInt(pool.length)];
+  }
+  state.caseInventory[cs.id]--;
+  if(state.caseInventory[cs.id]===0)delete state.caseInventory[cs.id];
+  state.inventory ||= {};state.inventory[card.id]=(state.inventory[card.id]||0)+1;
+  if(card.adminItem&&!state.customCards?.some(x=>x.id===card.id))state.customCards=[...(state.customCards||[]),card];
+  state.xp=(state.xp||0)+20;state.opens=(state.opens||0)+1;
+  state.hourProgress ||= {};const hk=cycle(HOUR_MS);state.hourProgress[hk] ||= {opens:0};state.hourProgress[hk].opens++;
+  trackQuick(state,"opens");trackQuick(state,"itemsWon");
+  state.collected=Object.keys(state.inventory).length;
+  tx.update(ref,{state,updatedAt:serverTimestamp()});
+  return {state,card};
+ });
+ const old=demoRead()||{};
+ const merged={...outcome.state,operations:old.operations||{}};
+ localStorage.setItem(demoKey(),JSON.stringify(merged));user=merged;
+ return {card:outcome.card,caseId:cs.id,balance:merged.balance,xp:merged.xp,opens:merged.opens,inventory:merged.inventory,caseInventory:merged.caseInventory};
+}
 async function call(name,data={}){
  if(!verified())throw Error("Подтверди электронную почту");
  let u=demoRead();
@@ -299,10 +338,11 @@ if(name==="claimQuest"){const k=cycle(QUICK_MS),q=quickQuests(k).find(x=>x.id===
  if(name==="openCase"){
   const cs=cases.find(x=>x.id===data.caseId);if(!cs)throw Error("Кейс не найден");
   if(u.operations[data.operationId])return u.operations[data.operationId];
+  if(data.useToken)return await openOwnedCaseTransaction(cs,data.operationId);
   const token=Boolean(data.useToken);if(cs.adminCase&&!token)throw Error("Уникальный кейс открывается только из инвентаря");if(token){if(Number(u.caseInventory?.[cs.id]||0)<1)throw Error("Кейс отсутствует в инвентаре")}else if(u.balance<cs.price)throw Error("Недостаточно VC");
   const roll=randomInt(1000000)/10000,w=caseOdds(cs);let rarity=0,total=0;
   for(let i=0;i<w.length;i++){total+=w[i];if(roll<total){rarity=i;break}}
-  const pool=casePool(cs,DEMO_RARITIES[rarity]);if(!pool.length)throw Error("Для этой редкости нет карточек");const card=cs.adminCase?(()=>{const choices=cs.drops.filter(x=>cards.some(c=>c.id===x.cardId)),roll=randomInt(1000000)/10000;let sum=0;for(const choice of choices){sum+=choice.chance;if(roll<sum)return cards.find(c=>c.id===choice.cardId)}return cards.find(c=>c.id===choices[choices.length-1].cardId)})():pool[randomInt(pool.length)];
+  const pool=casePool(cs,DEMO_RARITIES[rarity]);if(!pool.length)throw Error("Для этой редкости нет карточек");const card=pool[randomInt(pool.length)];
   if(token){u.caseInventory[cs.id]--;if(!u.caseInventory[cs.id])delete u.caseInventory[cs.id]}else u.balance-=cs.price;u.xp+=20;u.opens++;u.hourProgress ||= {};const hk=cycle(HOUR_MS);u.hourProgress[hk] ||= {opens:0};u.hourProgress[hk].opens++;trackQuick(u,"opens");trackQuick(u,"itemsWon");u.inventory[card.id]=(u.inventory[card.id]||0)+1;u.collected=Object.keys(u.inventory).length;
   const result={card,caseId:cs.id,balance:u.balance,xp:u.xp,opens:u.opens,inventory:u.inventory,caseInventory:u.caseInventory||{}};
   u.operations[data.operationId]=result;
