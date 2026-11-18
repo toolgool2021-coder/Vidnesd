@@ -7,6 +7,43 @@ const $=s=>document.querySelector(s),app=$("#app"),modal=$("#modal"),body=$("#mo
 let auth=null,functions=null,db=null,current=null,user=null,cases=[],cards=[],quests=[],weights=[],page="home",busy=false;
 const fmt=n=>Number(n||0).toLocaleString("ru-RU");
 const escape=s=>String(s??"").replace(/[&<>"']/g,x=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[x]));
+
+/* VIDNESD SFX — original Web Audio tones, no external files */
+const sfx={
+ enabled:localStorage.getItem("vidnesd_sfx")!=="off",ctx:null,lastClick:0,
+ init(){try{this.ctx ||= new (window.AudioContext||window.webkitAudioContext)();if(this.ctx.state==="suspended")this.ctx.resume().catch(()=>{});return this.ctx}catch{return null}},
+ tone(freq=440,duration=.09,type="sine",volume=.055,slide=0,delay=0){
+  if(!this.enabled)return;const ctx=this.init();if(!ctx)return;
+  const start=ctx.currentTime+delay,osc=ctx.createOscillator(),gain=ctx.createGain();
+  osc.type=type;osc.frequency.setValueAtTime(freq,start);
+  if(slide)osc.frequency.exponentialRampToValueAtTime(Math.max(40,freq+slide),start+duration);
+  gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),start+.008);
+  gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+  osc.connect(gain);gain.connect(ctx.destination);osc.start(start);osc.stop(start+duration+.012)
+ },
+ play(name){
+  if(!this.enabled)return;
+  if(name==="click")this.tone(560,.055,"sine",.025,-100);
+  if(name==="select"){this.tone(510,.08,"sine",.04,110);this.tone(770,.11,"sine",.028,50,.065)}
+  if(name==="open"){this.tone(210,.19,"triangle",.07,480);this.tone(440,.16,"sine",.03,250,.12)}
+  if(name==="tick")this.tone(360+Math.random()*130,.035,"triangle",.018,-110);
+  if(name==="sell"){this.tone(730,.11,"sine",.05,120);this.tone(1050,.17,"sine",.045,180,.095)}
+  if(name==="reward"){[440,554,659,880].forEach((n,i)=>this.tone(n,.22,"sine",.045,80,i*.11))}
+  if(name==="legendary"){[440,660,880,1100,1320].forEach((n,i)=>this.tone(n,.32,"sine",.065,70,i*.13))}
+  if(name==="fail"){this.tone(390,.2,"triangle",.055,-180);this.tone(220,.25,"triangle",.045,-90,.13)}
+  if(name==="craft"){this.tone(230,.3,"sawtooth",.028,420);this.tone(640,.23,"sine",.04,-200,.18)}
+  if(name==="trade"){this.tone(440,.12,"sine",.04,130);this.tone(660,.2,"sine",.04,100,.1)}
+ },
+ toggle(){this.enabled=!this.enabled;localStorage.setItem("vidnesd_sfx",this.enabled?"on":"off");this.updateButton();if(this.enabled)this.play("select")},
+ updateButton(){const b=document.getElementById("sfxToggle");if(b){b.textContent=this.enabled?"♪ Звук: вкл":"♪ Звук: выкл";b.setAttribute("aria-pressed",String(this.enabled));b.title="Включить или выключить звуковые эффекты"}}
+};
+document.addEventListener("pointerdown",e=>{
+ const button=e.target.closest("button");if(!button||button.id==="sfxToggle")return;
+ const now=performance.now();if(now-sfx.lastClick<65)return;sfx.lastClick=now;
+ sfx.play(button.classList.contains("style-choice")||button.classList.contains("trade-card-choice")?"select":"click");
+},{passive:true});
+document.addEventListener("change",e=>{if(e.target.matches('input[type="radio"],input[type="checkbox"],select'))sfx.play("select")});
+
 const toast=m=>{const el=document.createElement("div");el.className="toast";el.textContent=m;$("#toast").append(el);setTimeout(()=>el.remove(),4500)};
 const err=e=>{const msg=[e.code||"",e.message||String(e)].filter(Boolean).join(" · ").replace(/^Firebase: /,"").slice(0,320);toast(msg);console.error("[VIDNESD]",e)};
 // Free Spark demo. Game progress is stored locally, not protected from editing.
@@ -298,7 +335,7 @@ async function renderAdmin(){
  $("#adminCreate").onsubmit=e=>{e.preventDefault();lock(async()=>{const data=new FormData(e.target),name=String(data.get("name")).trim(),emoji=String(data.get("emoji")).trim(),rarity=String(data.get("rarity")),value=Number(data.get("value"));if(name.length<3||name.length>40||!emoji||emoji.length>8||!DEMO_RARITIES.includes(rarity)||!Number.isSafeInteger(value)||value<1||value>100000000)throw Error("Проверь параметры предмета");const id="admin_"+crypto.randomUUID(),item={id,name,emoji,rarity,value,adminItem:true,creator:OWNER_UID};await setDoc(doc(db,"adminItems",id),item);cards.push(item);toast("Предмет создан");await renderAdmin()})};
  $("#adminGrant").onsubmit=e=>{e.preventDefault();lock(async()=>{const data=new FormData(e.target),input=String(data.get("player")).trim().replace(/^@/,""),itemId=String(data.get("item")),count=Number(data.get("count"));if(!Number.isSafeInteger(count)||count<1||count>100)throw Error("Количество: от 1 до 100");const item=cards.find(c=>c.id===itemId&&c.adminItem);if(!item)throw Error("Сначала создай предмет");let uid=input;if(!/^[A-Za-z0-9]{20,128}$/.test(input)){const snap=await getDocs(query(collection(db,"tradeProfiles"),where("nickLower","==",input.toLowerCase()),limit(1)));if(snap.empty)throw Error("Игрок не найден");uid=snap.docs[0].id}const target=doc(db,"gameProfiles",uid);await runTransaction(db,async tx=>{const snap=await tx.get(target);if(!snap.exists())throw Error("Игрок должен сначала войти в игру и создать облачное сохранение");const state=snap.data().state;if(!state||state.uid!==uid)throw Error("Некорректный профиль игрока");const inventory={...(state.inventory||{})};inventory[itemId]=(inventory[itemId]||0)+count;const customCards=[...(state.customCards||[])];if(!customCards.some(c=>c.id===itemId))customCards.push(item);tx.update(target,{state:{...state,inventory,customCards,collected:Object.keys(inventory).length},updatedAt:serverTimestamp()})});if(uid===current.uid){await cloudSync;await restoreCloudProgress();user=demoRead();cards=[...DEMO_CARDS,...(user.customCards||[])];await loadAdminCatalog();render()}toast("Выдано "+count+" × "+item.name+". Игрок увидит после повторного входа.")})};
 }
-function render(){document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#balance").textContent=fmt(user?.balance);$("#authBtn").textContent=current?"Выйти":"Войти";
+function render(){sfx.updateButton();document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("active",b.dataset.page===page));$("#balance").textContent=fmt(user?.balance);$("#authBtn").textContent=current?"Выйти":"Войти";
 let adminNav=document.getElementById("adminNav");if(isAdmin()&&!adminNav){adminNav=document.createElement("button");adminNav.id="adminNav";adminNav.dataset.page="admin";adminNav.textContent="Админ";adminNav.onclick=()=>{page="admin";render()};document.getElementById("nav").append(adminNav)}else if(!isAdmin()&&adminNav)adminNav.remove();
 if(!user){app.innerHTML='<section class="hero"><div><div class="eyebrow">COLLECT · DISCOVER · LEVEL UP</div><h1>Твоя вселенная карточек</h1><p>Собирай уникальные коллекции, открывай бесплатные игровые кейсы, выполняй задания и поднимайся в рейтинге.</p><div class="actions"><button class="primary" id="join">Начать путешествие</button></div></div><div class="hero-art">💠</div></section><h2>Коллекционный мир</h2><div class="grid">'+["🌙","🐉","💎","🪐"].map((e,i)=>cardView({emoji:e,name:["Moonlight","Dragon","Crystal","Saturn"][i],rarity:["common","rare","epic","legendary"][i],value:0}).replace("0 VC","Коллекционная карточка")).join("")+'</div>';$("#join").onclick=()=>current?verifyModal():authModal();return}
 if(page==="home"){app.innerHTML='<section class="hero"><div><div class="eyebrow">WELCOME TO VIDNESD</div><h1>Открой свой Cardverse</h1><p>Собирай карточки, повышай уровень и открывай новые коллекции. Все награды исключительно игровые.</p><div class="actions"><button class="primary go" data-go="cases">Открыть кейсы</button><button class="secondary daily">Ежедневный бонус +150 VC</button><button class="secondary free-vc">'+(current.uid==="3gXPMPACBeftCtoSGqC6mL5T2iw2"?"Получить +10 000 VC · Владелец":Date.now()-(user.lastFreeVC||0)<1200000?"Бонус через "+Math.ceil((1200000-(Date.now()-user.lastFreeVC))/60000)+" мин":"Получить +3 000 VC · каждые 20 мин")+'</button></div></div><div class="hero-art">🪐</div></section>'+stats()+'<h2>Популярные кейсы</h2><div class="grid">'+cases.slice(0,8).map(caseView).join("")+'</div>'}
@@ -447,7 +484,7 @@ async function bootstrap(){cloudReady=false;await restoreCloudProgress();const d
 async function freeVC(){await lock(async()=>{const r=await call("freeVC");user.balance=r.balance;if(r.nextAt)user.lastFreeVC=r.nextAt-20*60*1000;render();toast("Получено +"+fmt(r.reward)+" VC!")})}
 async function daily(){await lock(async()=>{const r=await call("claimDaily");user.balance=r.balance;user.lastDaily=r.lastDaily;toast("Получено +150 VC");render();confetti()})}
 async function claim(id){await lock(async()=>{const r=await call("claimQuest",{questId:id});user.balance=r.balance;user.claimed=r.claimed;toast("Награда +"+r.reward+" VC");render();confetti()})}
-async function sell(id,quantity=1){await lock(async()=>{const r=await call("sellCard",{cardId:id,quantity});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;await waitCloudSave("Сохраняем продажу");toast("Продано "+quantity+" шт.");render()})}
+async function sell(id,quantity=1){await lock(async()=>{const r=await call("sellCard",{cardId:id,quantity});user.inventory=r.inventory;user.balance=r.balance;user.collected=r.collected;await waitCloudSave("Сохраняем продажу");sfx.play("sell");toast("Продано "+quantity+" шт.");render()})}
 function bulkSell(){
  const owned=cards.filter(c=>Number(user.inventory?.[c.id]||0)>0);
  if(!owned.length)return toast("Инвентарь пуст");
@@ -488,7 +525,7 @@ async function loadLeaders(){
   drawLeaders();
  }catch(e){if(requestId===leaderboardRequestId&&document.getElementById("leaders")===el){el.textContent="Не удалось загрузить рейтинг: "+(e.code||e.message);console.error("[VIDNESD] leaderboard",e)}}
 }
-function confetti(){if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
+function confetti(){sfx.play("reward");if(window.matchMedia("(prefers-reduced-motion: reduce)").matches)return;for(let i=0;i<65;i++){const s=document.createElement("div");s.className="spark";s.style.left=(35+Math.random()*30)+"vw";s.style.top=(25+Math.random()*30)+"vh";s.style.setProperty("--x",(Math.random()-.5)*700+"px");s.style.setProperty("--y",(Math.random()-.5)*650+"px");s.style.setProperty("--spark",["#a18bff","#6ee6ff","#ffca6b","#ff78bf"][i%4]);document.body.append(s);setTimeout(()=>s.remove(),1400)}}
 const sleep=t=>new Promise(r=>setTimeout(r,t));
 let openingStyle="roulette",upgradeSelected=[],upgradeTarget="",craftSelected=[];
 const OPEN_STYLES=[["roulette","🎰 Лента"],["vertical","⬇️ Вертикальная"],["slots","🎰 Барабан"],["grid","🔳 Сетка"],["shuffle","🃏 Перемешивание"],["wheel","🎡 Колесо"],["carousel","🌀 Карусель"],["stack","📚 Стопка"],["duel","⚔️ Две ленты"],["spotlight","🔦 Прожектор"],["spiral","🌀 Спираль"],["cascade","🌊 Каскад"]];
@@ -688,6 +725,7 @@ async function openCase(id){
   if(user.balance<c.price)throw Error("Недостаточно VC");
   const chosenStyle=openingStyle,chosenDuration=openingDuration;
   $("#startRoll").disabled=true;document.querySelectorAll("[data-style],[data-duration]").forEach(b=>b.disabled=true);
+  sfx.play("open");
   const r=await call("openCase",{caseId:id,operationId:crypto.randomUUID()});
   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
   await waitCloudSave("Сохраняем выпавший предмет");
@@ -696,6 +734,7 @@ async function openCase(id){
   if(openingEffects){area.classList.add("vfx-running");area.style.setProperty("--vfx-duration",duration+"ms")}
   await playOpening(area,chosenStyle,r.card,duration);
   area.classList.remove("vfx-running");
+  sfx.play(r.card.rarity==="legendary"?"legendary":"reward");
   openingFlash(area,r.card.rarity);openingBurst(area,r.card.rarity,r.card.rarity==="legendary"?55:30);
   await sleep(650);
   if(!document.body.contains(area))return;
