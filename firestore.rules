@@ -104,7 +104,7 @@ service cloud.firestore {
         && (!selling || old.inventory.get(listing.cardId,0) >= 1)
         && (selling || cancelling ? next.balance == old.balance
           : buying ? old.balance >= listing.price && next.balance == old.balance - listing.price
-          : next.balance == old.balance + listing.price)
+          : next.balance == old.balance + (listing.price * 97 / 100))
         && next.balance >= 0 && next.balance <= 1000000000;
     }
 
