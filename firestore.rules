@@ -78,11 +78,74 @@ service cloud.firestore {
         && (take == '' || next.inventory.get(take,0) == old.inventory.get(take,0) + 1);
     }
 
+
+    function marketProfileChange(uid) {
+      let id = request.resource.data.state.get('lastMarketId','');
+      let before = get(/databases/$(database)/documents/marketListings/$(id));
+      let after = getAfter(/databases/$(database)/documents/marketListings/$(id));
+      let old = resource.data.state;
+      let next = request.resource.data.state;
+      let listing = after.data;
+      let selling = !before.exists() && listing.status == 'active' && listing.seller == uid && uid == request.auth.uid;
+      let cancelling = before.exists() && before.data.status == 'active' && listing.status == 'cancelled' && listing.seller == uid && uid == request.auth.uid;
+      let buying = before.exists() && before.data.status == 'active' && listing.status == 'sold' && listing.buyer == request.auth.uid && uid == request.auth.uid;
+      let crediting = before.exists() && before.data.status == 'active' && listing.status == 'sold' && listing.seller == uid && listing.buyer == request.auth.uid;
+      let delta = selling ? -1 : cancelling || buying ? 1 : 0;
+      return signedIn() && id is string && id.size() >= 10 && id.size() <= 128
+        && (selling || cancelling || buying || crediting)
+        && request.resource.data.keys().hasOnly(['state','updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && next.uid == uid && next.lastMarketId == id
+        && next.diff(old).affectedKeys().hasOnly(['inventory','balance','collected','showcase','lastMarketId'])
+        && old.inventory is map && next.inventory is map
+        && next.inventory.diff(old.inventory).affectedKeys().hasOnly([listing.cardId])
+        && (crediting ? next.inventory == old.inventory
+          : next.inventory.get(listing.cardId,0) == old.inventory.get(listing.cardId,0) + delta)
+        && (!selling || old.inventory.get(listing.cardId,0) >= 1)
+        && (selling || cancelling ? next.balance == old.balance
+          : buying ? old.balance >= listing.price && next.balance == old.balance - listing.price
+          : next.balance == old.balance + listing.price)
+        && next.balance >= 0 && next.balance <= 1000000000;
+    }
+
+    match /marketListings/{listingId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['seller','cardId','price','status','createdAt'])
+        && request.resource.data.seller == request.auth.uid
+        && request.resource.data.cardId is string
+        && request.resource.data.cardId.size() >= 1
+        && request.resource.data.cardId.size() <= 100
+        && request.resource.data.price is int
+        && request.resource.data.price >= 1
+        && request.resource.data.price <= 100000000
+        && request.resource.data.status == 'active'
+        && request.resource.data.createdAt == request.time
+        && getAfter(/databases/$(database)/documents/gameProfiles/$(request.auth.uid)).data.state.lastMarketId == listingId;
+      allow update: if signedIn()
+        && resource.data.status == 'active'
+        && ((
+          resource.data.seller == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','closedAt'])
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.closedAt == request.time
+          && getAfter(/databases/$(database)/documents/gameProfiles/$(request.auth.uid)).data.state.lastMarketId == listingId
+        ) || (
+          resource.data.seller != request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','buyer','closedAt'])
+          && request.resource.data.status == 'sold'
+          && request.resource.data.buyer == request.auth.uid
+          && request.resource.data.closedAt == request.time
+          && getAfter(/databases/$(database)/documents/gameProfiles/$(request.auth.uid)).data.state.lastMarketId == listingId
+          && getAfter(/databases/$(database)/documents/gameProfiles/$(resource.data.seller)).data.state.lastMarketId == listingId
+        ));
+      allow delete: if false;
+    }
     // Prototype account-based save. Client-writable: not anti-cheat secure.
     match /gameProfiles/{uid} {
       allow get: if signedIn();
       allow list: if isOwner();
-      allow create, update: if validTradeSide(uid) || isOwner() || isSelf(uid)
+      allow create, update: if validTradeSide(uid) || marketProfileChange(uid) || isOwner() || isSelf(uid)
         && request.resource.data.keys().hasOnly(['state','updatedAt'])
         && request.resource.data.state is map
         && request.resource.data.state.uid == uid
