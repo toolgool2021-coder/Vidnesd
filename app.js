@@ -502,9 +502,10 @@ function renderUpgrade(){
  const {chance,average}=total?upgradeOdds(total,rewards):{chance:0,average:0};
  const minReward=rewards.length?Math.min(...rewards.map(c=>c.value)):0;
  const maxReward=rewards.length?Math.max(...rewards.map(c=>c.value)):0;
- app.innerHTML='<div class="eyebrow">CARD FORGE · RANDOM UPGRADE</div><h1>Апгрейд карточек 3.0</h1><p>Выбери до 5 карточек. Награда определяется случайно и всегда дороже суммы материалов при успехе. Чем дороже возможная награда, тем ниже шанс. При неудаче материалы исчезают.</p><div class="upgrade-layout"><div class="upgrade-panel"><h3>Материалы <small>'+upgradeSelected.length+'/5</small></h3><div class="upgrade-slots">'+Array.from({length:5},(_,i)=>{const c=cards.find(x=>x.id===upgradeSelected[i]);return '<button class="upgrade-slot" data-slot="'+i+'">'+(c?'<span>'+c.emoji+'</span><small>'+escape(c.name)+'</small>':'<span>＋</span><small>Слот '+(i+1)+'</small>')+'</button>'}).join("")+'</div><p>Стоимость материалов: <b>'+fmt(total)+' VC</b></p></div><div class="upgrade-center"><div class="upgrade-ring" style="--progress:'+chance+'%"><div><strong>'+chance+'%</strong><small>Шанс успеха</small></div></div><p>'+(rewards.length?'В случае успеха предмет будет дороже вложений':'Выбери материалы на сумму ниже стоимости доступных карточек')+'</p><button class="primary" id="upgradeNow" '+(!upgradeSelected.length||!rewards.length?'disabled':'')+'>⚡ Испытать шанс</button></div><div class="upgrade-panel"><h3>Случайная награда</h3><div class="upgrade-target"><div class="upgrade-big">🎁</div><b>Неизвестный предмет</b><span class="tag">RANDOM UPGRADE</span><strong>'+(rewards.length?fmt(minReward)+'–'+fmt(maxReward)+' VC':'Нет доступных наград')+'</strong><p>Средняя цена при успехе: '+fmt(Math.round(average))+' VC</p><p>Доступно '+rewards.length+' карточек</p></div></div></div><h2>Твой инвентарь</h2><p>Нажми на карточку, чтобы добавить её в материалы. Можно использовать несколько одинаковых.</p><div class="upgrade-inventory">'+(owned.length?owned.map(c=>{const selectedCount=upgradeSelected.filter(id=>id===c.id).length,remaining=user.inventory[c.id]-selectedCount,exhausted=remaining<=0;return '<button class="upgrade-inv-card '+(exhausted?'upgrade-exhausted ':selectedCount?'upgrade-picked ':'')+'" data-add="'+c.id+'" '+(exhausted||upgradeSelected.length>=5?'disabled':'')+' aria-label="'+escape(c.name)+', выбрано '+selectedCount+', осталось '+remaining+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC · ×'+user.inventory[c.id]+'</small>'+(selectedCount?'<em class="upgrade-selected-count">Выбрано: '+selectedCount+'</em>':'')+(exhausted?'<em class="upgrade-no-copies">Нет свободных копий</em>':'')+'</button>'}).join(""):'<div class="empty">Инвентарь пуст. Открой кейсы, чтобы получить материалы.</div>')+'</div>';
+ app.innerHTML='<div class="eyebrow">CARD FORGE · RANDOM UPGRADE</div><h1>Апгрейд карточек 3.0</h1><p>Выбери до 5 карточек. Награда определяется случайно и всегда дороже суммы материалов при успехе. Чем дороже возможная награда, тем ниже шанс. При неудаче материалы исчезают.</p><div class="upgrade-layout"><div class="upgrade-panel"><h3>Материалы <small>'+upgradeSelected.length+'/5</small></h3><div class="upgrade-slots">'+Array.from({length:5},(_,i)=>{const c=cards.find(x=>x.id===upgradeSelected[i]);return '<button class="upgrade-slot" data-slot="'+i+'">'+(c?'<span>'+c.emoji+'</span><small>'+escape(c.name)+'</small>':'<span>＋</span><small>Слот '+(i+1)+'</small>')+'</button>'}).join("")+'</div><p>Стоимость материалов: <b>'+fmt(total)+' VC</b></p></div><div class="upgrade-center"><div class="upgrade-ring" style="--progress:'+chance+'%"><div><strong>'+chance+'%</strong><small>Шанс успеха</small></div></div><p>'+(rewards.length?'В случае успеха предмет будет дороже вложений':'Выбери материалы на сумму ниже стоимости доступных карточек')+'</p><button class="primary" id="upgradeNow" '+(!upgradeSelected.length||!rewards.length?'disabled':'')+'>⚡ Испытать шанс</button><div class="auto-upgrade-box"><button class="secondary" id="autoUpgradeStart" '+(!upgradeSelected.length||!rewards.length?'disabled':'')+'>▶ Автоапгрейд ×10</button><button class="secondary" id="autoUpgradeStop" disabled>■ Стоп</button><small id="autoUpgradeStatus">Повторяет выбранные материалы, пока хватает копий</small></div></div><div class="upgrade-panel"><h3>Случайная награда</h3><div class="upgrade-target"><div class="upgrade-big">🎁</div><b>Неизвестный предмет</b><span class="tag">RANDOM UPGRADE</span><strong>'+(rewards.length?fmt(minReward)+'–'+fmt(maxReward)+' VC':'Нет доступных наград')+'</strong><p>Средняя цена при успехе: '+fmt(Math.round(average))+' VC</p><p>Доступно '+rewards.length+' карточек</p></div></div></div><h2>Твой инвентарь</h2><p>Нажми на карточку, чтобы добавить её в материалы. Можно использовать несколько одинаковых.</p><div class="upgrade-inventory">'+(owned.length?owned.map(c=>{const selectedCount=upgradeSelected.filter(id=>id===c.id).length,remaining=user.inventory[c.id]-selectedCount,exhausted=remaining<=0;return '<button class="upgrade-inv-card '+(exhausted?'upgrade-exhausted ':selectedCount?'upgrade-picked ':'')+'" data-add="'+c.id+'" '+(exhausted||upgradeSelected.length>=5?'disabled':'')+' aria-label="'+escape(c.name)+', выбрано '+selectedCount+', осталось '+remaining+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC · ×'+user.inventory[c.id]+'</small>'+(selectedCount?'<em class="upgrade-selected-count">Выбрано: '+selectedCount+'</em>':'')+(exhausted?'<em class="upgrade-no-copies">Нет свободных копий</em>':'')+'</button>'}).join(""):'<div class="empty">Инвентарь пуст. Открой кейсы, чтобы получить материалы.</div>')+'</div>';
  document.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{const id=b.dataset.add;if(upgradeSelected.length>=5)return toast("Максимум 5 материалов");if(upgradeSelected.filter(x=>x===id).length>=user.inventory[id])return toast("Больше копий нет");upgradeSelected.push(id);renderUpgrade()});
  document.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.slot);if(i<upgradeSelected.length){upgradeSelected.splice(i,1);renderUpgrade()}});
+ $("#autoUpgradeStart").onclick=runAutoUpgrade;$("#autoUpgradeStop").onclick=stopAutoPlay;
  $("#upgradeNow").onclick=()=>lock(async()=>{
   const r=await call("upgradeCard",{sourceIds:[...upgradeSelected]});
   user.inventory=r.inventory;user.collected=r.collected;user.showcase=r.showcase;upgradeSelected=[];renderUpgrade();
@@ -620,13 +621,67 @@ async function playOpening(area,style,win,duration){
   elements.at(-1).classList.add("winner");await pause(tick);
  }
 }
+let autoPlay=null;
+function stopAutoPlay(){if(autoPlay){autoPlay.stopped=true;autoPlay=null}const el=document.getElementById("autoPlayStatus");if(el)el.textContent="Автоматический режим остановлен"}
+function autoControls(kind,id){
+ const running=autoPlay&&!autoPlay.stopped;
+ return '<div class="auto-play-panel"><div><strong>Автоматический режим</strong><p>До 10 операций подряд. Каждая операция сохраняется в Firebase. Остановится при нехватке VC, предметов или ошибке.</p></div><div class="auto-play-actions"><button class="secondary" id="autoStart" '+(running?'disabled':'')+'>▶ Авто ×10</button><button class="secondary" id="autoStop" '+(!running?'disabled':'')+'>■ Остановить</button></div><small id="autoPlayStatus">'+(running?'Выполняется...':'Не запущен')+'</small></div>';
+}
+async function runAutoCases(caseId){
+ if(autoPlay||busy)return;
+ const c=cases.find(x=>x.id===caseId);if(!c)return;
+ const job={stopped:false};autoPlay=job;let done=0;
+ const start=document.getElementById("autoStart"),stop=document.getElementById("autoStop"),status=document.getElementById("autoPlayStatus");
+ if(start)start.disabled=true;if(stop)stop.disabled=false;
+ try{
+  for(let i=0;i<10&&!job.stopped;i++){
+   if(user.balance<c.price)break;
+   if(status)status.textContent="Открываем "+(i+1)+" / 10...";
+   const r=await call("openCase",{caseId,operationId:crypto.randomUUID()});
+   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;
+   await cloudSync;if(cloudSaveError)throw cloudSaveError;
+   done++;
+   if(status)status.textContent="Получено: "+escape(r.card.name)+" · "+fmt(r.card.value)+" VC · "+done+"/10";
+   $("#balance").textContent=fmt(user.balance);
+   await sleep(550);
+  }
+  toast("Автооткрытие: "+done+" кейсов");
+ }catch(e){err(e)}
+ finally{if(autoPlay===job)autoPlay=null;if(start)start.disabled=false;if(stop)stop.disabled=true;if(status)status.textContent="Завершено: "+done+" / 10";render()}
+}
+async function runAutoUpgrade(){
+ if(autoPlay||busy)return;
+ const ids=[...upgradeSelected];
+ if(!ids.length)return toast("Сначала выбери материалы для апгрейда");
+ const job={stopped:false};autoPlay=job;let done=0;
+ const start=$("#autoUpgradeStart"),stop=$("#autoUpgradeStop"),status=$("#autoUpgradeStatus");
+ if(start)start.disabled=true;if(stop)stop.disabled=false;
+ try{
+  for(let i=0;i<10&&!job.stopped;i++){
+   const counts={};for(const id of ids)counts[id]=(counts[id]||0)+1;
+   if(Object.entries(counts).some(([id,n])=>Number(user.inventory[id]||0)<n))break;
+   const total=ids.reduce((n,id)=>n+(cards.find(c=>c.id===id)?.value||0),0);
+   if(!upgradeRewards(total).length)break;
+   if(status)status.textContent="Апгрейд "+(i+1)+" / 10...";
+   const result=await call("upgradeCard",{sourceIds:ids});
+   user.inventory=result.inventory;user.collected=result.collected;user.showcase=result.showcase;
+   await cloudSync;if(cloudSaveError)throw cloudSaveError;
+   done++;
+   if(status)status.textContent=(result.success?"Успех: "+result.card.name:"Неудача")+" · "+done+"/10";
+   await sleep(650);
+  }
+  upgradeSelected=[];toast("Автоапгрейд: "+done+" попыток");
+ }catch(e){err(e)}
+ finally{if(autoPlay===job)autoPlay=null;render()}
+}
 async function openCase(id){
  const c=cases.find(x=>x.id===id);if(!c)return;const w=caseOdds(c);
- show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div><div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
+ show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC · Шансы: '+w.map((v,i)=>["Обычная","Редкая","Эпическая","Легендарная"][i]+' '+v+'%').join(" · ")+'</p><h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div>'+autoControls("cases",id)+'<div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
  $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2><p>Шансы редкостей: '+w.map((v,i)=>v?["Обычная","Редкая","Эпическая","Легендарная"][i]+" "+v+"%":"").filter(Boolean).join(" · ")+'</p><div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
+ $("#autoStart").onclick=()=>runAutoCases(id);$("#autoStop").onclick=stopAutoPlay;
  $("#startRoll").onclick=()=>lock(async()=>{
   if(user.balance<c.price)throw Error("Недостаточно VC");
   const chosenStyle=openingStyle,chosenDuration=openingDuration;
