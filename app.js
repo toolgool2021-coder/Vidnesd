@@ -25,8 +25,8 @@ const sfx={
   if(!this.enabled)return;
   if(name==="click")this.tone(560,.055,"sine",.025,-100);
   if(name==="select"){this.tone(510,.08,"sine",.04,110);this.tone(770,.11,"sine",.028,50,.065)}
-  if(name==="open"){this.tone(210,.19,"triangle",.07,480);this.tone(440,.16,"sine",.03,250,.12)}
-  if(name==="tick")this.tone(360+Math.random()*130,.035,"triangle",.018,-110);
+  if(name==="open")this.tone(190,.11,"triangle",.026,-65)
+  if(name==="tick"){this.tone(155,.028,"triangle",.022,-75);this.tone(1050,.014,"square",.006,-520)}
   if(name==="sell"){this.tone(730,.11,"sine",.05,120);this.tone(1050,.17,"sine",.045,180,.095)}
   if(name==="reward"){[440,554,659,880].forEach((n,i)=>this.tone(n,.22,"sine",.045,80,i*.11))}
   if(name==="legendary"){[440,660,880,1100,1320].forEach((n,i)=>this.tone(n,.32,"sine",.065,70,i*.13))}
@@ -39,13 +39,7 @@ const sfx={
 };
 document.getElementById("sfxToggle")?.addEventListener("click",()=>sfx.toggle());
 sfx.updateButton();
-document.addEventListener("pointerdown",e=>{
- const button=e.target.closest("button");if(!button||button.id==="sfxToggle")return;
- const now=performance.now();if(now-sfx.lastClick<65)return;sfx.lastClick=now;
- sfx.play(button.classList.contains("style-choice")||button.classList.contains("trade-card-choice")?"select":"click");
-},{passive:true});
-document.addEventListener("change",e=>{if(e.target.matches('input[type="radio"],input[type="checkbox"],select'))sfx.play("select")});
-
+// Button presses are intentionally silent.\n
 const toast=m=>{const el=document.createElement("div");el.className="toast";el.textContent=m;$("#toast").append(el);setTimeout(()=>el.remove(),4500)};
 const err=e=>{const msg=[e.code||"",e.message||String(e)].filter(Boolean).join(" · ").replace(/^Firebase: /,"").slice(0,320);toast(msg);console.error("[VIDNESD]",e)};
 // Free Spark demo. Game progress is stored locally, not protected from editing.
@@ -565,6 +559,18 @@ function openingBurst(host,rarity="rare",count=26){
 }
 function openingFlash(host,rarity){if(!openingEffects||!host)return;const e=document.createElement("div");e.className="vfx-flash rarity-"+rarity;host.append(e);setTimeout(()=>e.remove(),1000)}
 function openingTile(c){return '<div class="draw-tile rarity-'+c.rarity+'"><span>'+c.emoji+'</span><b>'+escape(c.name)+'</b><small>'+fmt(c.value)+' VC</small></div>'}
+function rouletteTicks(duration,steps){
+ let active=true,last=-1;const started=performance.now();
+ function frame(now){
+  if(!active||!sfx.enabled)return;
+  const t=Math.min(1,(now-started)/duration);
+  const index=Math.floor((1-Math.pow(1-t,3.6))*steps);
+  if(index!==last){last=index;sfx.play("tick")}
+  if(t<1)requestAnimationFrame(frame)
+ }
+ requestAnimationFrame(frame);
+ return ()=>{active=false};
+}
 async function playOpening(area,style,win,duration){
  const pick=()=>cards[randomInt(cards.length)],pause=t=>new Promise(resolve=>setTimeout(resolve,t));
  if(style==="roulette"||style==="carousel"||style==="vertical"||style==="slots"){
@@ -578,9 +584,10 @@ async function playOpening(area,style,win,duration){
   const step=(vertical?tile.offsetHeight:tile.offsetWidth)+gap;
   const center=(vertical?windowEl.clientHeight:windowEl.clientWidth)/2;
   const offset=idx*step+(vertical?tile.offsetHeight:tile.offsetWidth)/2-center;
+  const stopTicks=rouletteTicks(duration,idx);
   track.style.transition='transform '+duration+'ms cubic-bezier(.07,.72,.12,1)';
   track.style.transform=vertical?'translateY(-'+offset+'px)':'translateX(-'+offset+'px)';
-  await pause(duration+100);
+  await pause(duration+100);stopTicks();
   return;
  }
  if(style==="grid"){
@@ -595,7 +602,7 @@ async function playOpening(area,style,win,duration){
   const sum=weights.reduce((x,y)=>x+y,0);
   for(let i=0;i<steps;i++){
    tiles.forEach(x=>x.classList.remove("active"));
-   tiles[path[i%path.length]].classList.add("active");
+   tiles[path[i%path.length]].classList.add("active");sfx.play("tick");
    await pause(duration*weights[i]/sum);
   }
   return;
@@ -616,9 +623,10 @@ async function playOpening(area,style,win,duration){
   const rotor=area.querySelector(".draw-wheel-rotor");await pause(100);
   const revolutions=duration>11000?8:duration>9000?7:6;
   const finalAngle=revolutions*360-winnerIndex*(360/size);
+  const stopTicks=rouletteTicks(duration,revolutions*size);
   rotor.style.transition='transform '+duration+'ms cubic-bezier(.07,.74,.12,1)';
   rotor.style.transform='rotate('+finalAngle+'deg)';
-  await pause(duration+100);return;
+  await pause(duration+100);stopTicks();return;
  }
  if(style==="duel"){
   const n=duration>11000?66:duration>9000?54:44,idx=n-(3+randomInt(9));
