@@ -399,6 +399,7 @@ async function settleTrade(tradeId){
   if(from.balance<offerVC||to.balance<wantVC)throw Error("Недостаточно VC для обмена");
   if(t.offerCard&&Number(from.inventory?.[t.offerCard]||0)<1)throw Error("У отправителя больше нет предлагаемого предмета");
   if(t.wantCard&&Number(to.inventory?.[t.wantCard]||0)<1)throw Error("У получателя больше нет запрошенного предмета");
+  if(t.offerCard&&t.wantCard&&t.offerCard===t.wantCard)throw Error("Нельзя обменивать один и тот же тип предмета с обеих сторон");
   if(t.offerCard){from.inventory[t.offerCard]--;if(!from.inventory[t.offerCard])delete from.inventory[t.offerCard];to.inventory[t.offerCard]=(to.inventory[t.offerCard]||0)+1}
   if(t.wantCard){to.inventory[t.wantCard]--;if(!to.inventory[t.wantCard])delete to.inventory[t.wantCard];from.inventory[t.wantCard]=(from.inventory[t.wantCard]||0)+1}
   from.balance=from.balance-offerVC+wantVC;to.balance=to.balance-wantVC+offerVC;
@@ -441,6 +442,7 @@ async function renderTrades(){
   const data=new FormData(e.target),recipient=$("#tradeRecipient").value;
   if(!/^[A-Za-z0-9]{20,128}$/.test(recipient)||recipient===current.uid)throw Error("Сначала найди и выбери игрока");
   const offerCard=String(data.get("offerCard")||""),wantCard=String(data.get("wantCard")||"");
+  if(offerCard&&offerCard===wantCard)throw Error("Выбери разные предметы для обмена");
   const offerVC=Number(data.get("offerVC")),wantVC=Number(data.get("wantVC"));
   if(!Number.isSafeInteger(offerVC)||!Number.isSafeInteger(wantVC)||offerVC<0||wantVC<0||offerVC>100000000||wantVC>100000000)throw Error("Некорректная сумма VC");
   if(offerCard&&!user.inventory[offerCard])throw Error("У тебя нет этой карточки");
