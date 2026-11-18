@@ -379,10 +379,45 @@ async function publishTradeProfile(){return saveNickname(user.nick)}
 function tradeCardPicker(title,field,items){
  return '<div class="trade-picker"><div class="trade-picker-title">'+title+'</div><div class="trade-picker-grid"><label class="trade-card-choice"><input type="radio" name="'+field+'" value="" checked><span class="trade-card-art">∅</span><strong>Без предмета</strong><small>Только VC</small></label>'+items.map(c=>'<label class="trade-card-choice rarity-'+c.rarity+'"><input type="radio" name="'+field+'" value="'+escape(c.id)+'"><span class="trade-card-art">'+c.emoji+'</span><strong>'+escape(c.name)+'</strong><small>'+fmt(c.value)+' VC · '+escape(c.rarity)+'</small></label>').join("")+'</div></div>';
 }
+
+async function settleTrade(tradeId){
+ if(!cloudReady)throw Error("Для передачи предметов нужно облачное сохранение. Проверь Firestore Rules");
+ await cloudSync;
+ const ref=doc(db,"tradeRequests",tradeId),myUid=current.uid;
+ const result=await runTransaction(db,async tx=>{
+  const tradeSnap=await tx.get(ref);
+  if(!tradeSnap.exists())throw Error("Предложение не найдено");
+  const t=tradeSnap.data();
+  if(t.status!=="pending"||t.recipient!==myUid)throw Error("Обмен уже обработан");
+  const senderRef=doc(db,"gameProfiles",t.sender),receiverRef=doc(db,"gameProfiles",myUid);
+  const senderSnap=await tx.get(senderRef),receiverSnap=await tx.get(receiverRef);
+  if(!senderSnap.exists()||!receiverSnap.exists())throw Error("У одного из игроков отсутствует облачный профиль");
+  const from=structuredClone(senderSnap.data().state),to=structuredClone(receiverSnap.data().state);
+  if(from.uid!==t.sender||to.uid!==myUid)throw Error("Некорректные профили");
+  const offerVC=Number(t.offerVC||0),wantVC=Number(t.wantVC||0);
+  if(!Number.isSafeInteger(offerVC)||!Number.isSafeInteger(wantVC)||offerVC<0||wantVC<0)throw Error("Некорректные суммы");
+  if(from.balance<offerVC||to.balance<wantVC)throw Error("Недостаточно VC для обмена");
+  if(t.offerCard&&Number(from.inventory?.[t.offerCard]||0)<1)throw Error("У отправителя больше нет предлагаемого предмета");
+  if(t.wantCard&&Number(to.inventory?.[t.wantCard]||0)<1)throw Error("У получателя больше нет запрошенного предмета");
+  if(t.offerCard){from.inventory[t.offerCard]--;if(!from.inventory[t.offerCard])delete from.inventory[t.offerCard];to.inventory[t.offerCard]=(to.inventory[t.offerCard]||0)+1}
+  if(t.wantCard){to.inventory[t.wantCard]--;if(!to.inventory[t.wantCard])delete to.inventory[t.wantCard];from.inventory[t.wantCard]=(from.inventory[t.wantCard]||0)+1}
+  from.balance=from.balance-offerVC+wantVC;to.balance=to.balance-wantVC+offerVC;
+  if(from.balance>1e9||to.balance>1e9)throw Error("Превышен лимит баланса");
+  for(const p of [from,to]){p.collected=Object.keys(p.inventory).length;p.showcase=(p.showcase||[]).filter(id=>p.inventory[id]>0)}
+  tx.update(senderRef,{state:from,updatedAt:serverTimestamp()});
+  tx.update(receiverRef,{state:to,updatedAt:serverTimestamp()});
+  tx.update(ref,{status:"accepted",settledAt:serverTimestamp()});
+  return to;
+ });
+ const local=demoRead()||{};
+ localStorage.setItem(demoKey(),JSON.stringify({...result,operations:local.operations||{}}));
+ user={...result,operations:local.operations||{}};
+ sfx.play("trade");render();toast("Обмен завершён: предметы и VC переданы!");
+}
 async function renderTrades(){
  const owned=cards.filter(c=>user.inventory?.[c.id]>0);
  const options='<option value="">Без карточки</option>'+owned.map(c=>'<option value="'+escape(c.id)+'">'+escape(c.name)+' · '+fmt(c.value)+' VC</option>').join("");
- app.innerHTML='<div class="eyebrow">PLAYER EXCHANGE · FIRESTORE</div><h1>Обмены между игроками</h1><p>Найди игрока по нику, выбери предмет и валюту, которые отдаёшь и хочешь получить. Можно выбрать «ничего». Пока это только предложения: баланс и карточки автоматически не переводятся.</p><p>Твой ник: <b>@'+escape(user.nick)+'</b> · <button class="secondary" id="publishTrade">Обновить ник в поиске</button> · <button class="secondary" id="editTradeNick">Изменить ник</button></p><form class="form" id="tradeForm"><label>Поиск игрока по нику<input id="tradeSearch" placeholder="Начни вводить ник..." maxlength="20" required></label><button class="secondary" id="findTrader" type="button">Найти игрока</button><div id="foundTrader" class="muted">Выбери получателя</div><input id="tradeRecipient" type="hidden" required><h3>Ты отдаёшь</h3>'+tradeCardPicker("Твои предметы","offerCard",owned)+'<label>VC (0 = без валюты)<input name="offerVC" type="number" min="0" max="100000000" value="0" required></label><h3>Ты получаешь</h3>'+tradeCardPicker("Желаемый предмет","wantCard",DEMO_CARDS)+'<label>VC (0 = без валюты)<input name="wantVC" type="number" min="0" max="100000000" value="0" required></label><button class="primary" type="submit">Отправить предложение</button></form><div class="trade-head"><div><h2>Мои обмены</h2><p>Завершённые заявки свёрнуты в историю</p></div><div class="trade-filters"><button type="button" class="secondary active" id="tradeActive">Активные</button><button type="button" class="secondary" id="tradeHistory">История</button></div></div><div id="tradeList">Загрузка...</div>';
+ app.innerHTML='<div class="eyebrow">PLAYER EXCHANGE · FIRESTORE</div><h1>Обмены между игроками</h1><p>Найди игрока по нику, выбери предмет и валюту, которые отдаёшь и хочешь получить. Можно выбрать «ничего». После принятия предметы и VC передаются через Firestore.</p><p>Твой ник: <b>@'+escape(user.nick)+'</b> · <button class="secondary" id="publishTrade">Обновить ник в поиске</button> · <button class="secondary" id="editTradeNick">Изменить ник</button></p><form class="form" id="tradeForm"><label>Поиск игрока по нику<input id="tradeSearch" placeholder="Начни вводить ник..." maxlength="20" required></label><button class="secondary" id="findTrader" type="button">Найти игрока</button><div id="foundTrader" class="muted">Выбери получателя</div><input id="tradeRecipient" type="hidden" required><h3>Ты отдаёшь</h3>'+tradeCardPicker("Твои предметы","offerCard",owned)+'<label>VC (0 = без валюты)<input name="offerVC" type="number" min="0" max="100000000" value="0" required></label><h3>Ты получаешь</h3>'+tradeCardPicker("Желаемый предмет","wantCard",DEMO_CARDS)+'<label>VC (0 = без валюты)<input name="wantVC" type="number" min="0" max="100000000" value="0" required></label><button class="primary" type="submit">Отправить предложение</button></form><div class="trade-head"><div><h2>Мои обмены</h2><p>Завершённые заявки свёрнуты в историю</p></div><div class="trade-filters"><button type="button" class="secondary active" id="tradeActive">Активные</button><button type="button" class="secondary" id="tradeHistory">История</button></div></div><div id="tradeList">Загрузка...</div>';
  $("#editTradeNick").onclick=()=>{page="profile";render()};
  $("#publishTrade").onclick=()=>lock(async()=>{await publishTradeProfile();toast("Твой ник теперь доступен для поиска")});
  let searchTimer=null,searchSerial=0;
@@ -424,7 +459,7 @@ async function renderTrades(){
   let tab="active",historyLimit=5;
   const active=all.filter(d=>d.data().status==="pending");
   const history=all.filter(d=>d.data().status!=="pending"&&!archived.has(d.id));
-  const statusText={pending:"Ожидает ответа",accepted:"Принято · без передачи",declined:"Отклонено"};
+  const statusText={pending:"Ожидает ответа",accepted:"Обмен завершён",declined:"Отклонено"};
   function drawTrades(){
    $("#tradeActive").classList.toggle("active",tab==="active");
    $("#tradeHistory").classList.toggle("active",tab==="history");
@@ -438,7 +473,7 @@ async function renderTrades(){
     return '<article class="trade-entry"><div class="trade-entry-top"><span class="trade-direction">'+(incoming?"↙ Входящее":"↗ Исходящее")+'</span><span class="trade-status '+escape(x.status)+'">'+escape(statusText[x.status]||x.status)+'</span></div><div class="trade-summary"><span><small>Отдаёт</small><strong>'+escape(offer)+'</strong></span><span class="trade-swap">⇄</span><span><small>Получает</small><strong>'+escape(want)+'</strong></span></div><div class="trade-entry-bottom"><span>Игрок · '+escape((incoming?x.sender:x.recipient).slice(0,8))+'…</span><div class="trade-actions">'+(incoming&&x.status==="pending"?'<button class="secondary trade-answer" data-id="'+d.id+'" data-status="accepted">Принять</button><button class="secondary trade-answer" data-id="'+d.id+'" data-status="declined">Отклонить</button>':'')+(x.status!=="pending"?'<button class="trade-archive" data-id="'+d.id+'" title="Скрыть из истории">Скрыть</button>':'')+'</div></div></article>'
    }).join("")+'</div>':'<div class="trade-empty">'+(tab==="active"?"Активных предложений нет":"История пуста")+'</div>';
    if(tab==="history"&&history.length>historyLimit)$("#tradeList").insertAdjacentHTML("beforeend",'<button class="secondary trade-more" id="tradeMore">Показать ещё ('+(history.length-historyLimit)+')</button>');
-   document.querySelectorAll(".trade-answer").forEach(btn=>btn.onclick=()=>lock(async()=>{await updateDoc(doc(db,"tradeRequests",btn.dataset.id),{status:btn.dataset.status});toast("Статус обновлён. Передачи активов нет.");renderTrades()}));
+   document.querySelectorAll(".trade-answer").forEach(btn=>btn.onclick=()=>lock(async()=>{if(btn.dataset.status==="accepted")await settleTrade(btn.dataset.id);else{await updateDoc(doc(db,"tradeRequests",btn.dataset.id),{status:"declined"});toast("Предложение отклонено")}renderTrades()}));
    document.querySelectorAll(".trade-archive").forEach(btn=>btn.onclick=()=>{archived.add(btn.dataset.id);localStorage.setItem(archiveKey,JSON.stringify([...archived]));const i=history.findIndex(d=>d.id===btn.dataset.id);if(i>=0)history.splice(i,1);drawTrades()});
    const more=$("#tradeMore");if(more)more.onclick=()=>{historyLimit+=5;drawTrades()};
   }
