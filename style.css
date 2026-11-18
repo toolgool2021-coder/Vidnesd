@@ -577,3 +577,5 @@ body.design-v44 #toast .toast,body.design-v44 .toast{background:#20313c;color:#e
 .odds-line{display:flex;align-items:center;gap:8px;font-size:13px}.odds-line strong{margin-left:auto;font-variant-numeric:tabular-nums}
 .odds-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;background:#8c9baa}.odds-line.odds-1 .odds-dot{background:#54a8fa}.odds-line.odds-2 .odds-dot{background:#bd85ff}.odds-line.odds-3 .odds-dot{background:#f4c466}
 @media(max-width:460px){.odds-panel{padding:14px}.odds-legend{grid-template-columns:1fr}}
+
+.delivery-quest{display:flex;align-items:center;gap:16px}.delivery-quest>div:nth-child(2){flex:1;min-width:0}.delivery-art{width:64px;height:64px;flex-shrink:0;display:grid;place-items:center;border-radius:16px;background:linear-gradient(135deg,rgba(120,160,230,.18),rgba(150,110,200,.08));border:1px solid rgba(150,170,205,.2);font-size:34px}.delivery-status{display:block;margin-top:8px;font-size:12px;font-weight:700}.delivery-status.available{color:#56c994}.delivery-status.missing{color:#e6a16f}@media(max-width:520px){.delivery-quest{flex-wrap:wrap}.delivery-quest button{margin-left:auto}}
