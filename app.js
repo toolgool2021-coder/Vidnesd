@@ -37,6 +37,8 @@ const sfx={
  toggle(){this.enabled=!this.enabled;localStorage.setItem("vidnesd_sfx",this.enabled?"on":"off");this.updateButton();if(this.enabled)this.play("select")},
  updateButton(){const b=document.getElementById("sfxToggle");if(b){b.textContent=this.enabled?"♪ Звук: вкл":"♪ Звук: выкл";b.setAttribute("aria-pressed",String(this.enabled));b.title="Включить или выключить звуковые эффекты"}}
 };
+document.getElementById("sfxToggle")?.addEventListener("click",()=>sfx.toggle());
+sfx.updateButton();
 document.addEventListener("pointerdown",e=>{
  const button=e.target.closest("button");if(!button||button.id==="sfxToggle")return;
  const now=performance.now();if(now-sfx.lastClick<65)return;sfx.lastClick=now;
