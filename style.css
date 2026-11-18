@@ -266,3 +266,10 @@
 
 /* v37 owner inventory tools */
 .admin-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin:22px 0}.admin-panel{min-width:0;padding:20px;border-radius:18px;border:1px solid #ffffff1d;background:#171d30}.admin-panel h2{margin-top:0}.admin-panel input,.admin-panel select{width:100%;box-sizing:border-box}@media(max-width:720px){.admin-layout{grid-template-columns:1fr}.admin-panel{padding:15px}}
+
+/* v39 bulk selling */
+.bulk-sell-list{display:flex;flex-direction:column;gap:8px;max-height:min(55vh,480px);overflow-y:auto;margin:15px 0;padding-right:4px}
+.bulk-sell-row{display:grid;grid-template-columns:46px minmax(0,1fr) 85px;align-items:center;gap:10px;padding:9px;border-radius:12px;border:1px solid #ffffff20;background:#ffffff09}
+.bulk-sell-art{font-size:30px;text-align:center}.bulk-sell-row strong{display:block;font-size:13px;overflow-wrap:anywhere}.bulk-sell-row small{display:block;color:#aab4cf;font-size:11px}.bulk-sell-row input{width:100%;min-width:0;box-sizing:border-box}
+.bulk-sell-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px}
+#bulkSellBtn{margin:12px 0 20px}
