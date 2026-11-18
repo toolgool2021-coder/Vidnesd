@@ -284,11 +284,11 @@ if(name==="claimQuest"){const k=cycle(QUICK_MS),q=quickQuests(k).find(x=>x.id===
  if(name==="openCase"){
   const cs=DEMO_CASES.find(x=>x.id===data.caseId);if(!cs)throw Error("Кейс не найден");
   if(u.operations[data.operationId])return u.operations[data.operationId];
-  if(u.balance<cs.price)throw Error("Недостаточно VC");
+  const token=Boolean(data.useToken);if(token){if(Number(u.caseInventory?.[cs.id]||0)<1)throw Error("Кейс отсутствует в инвентаре")}else if(u.balance<cs.price)throw Error("Недостаточно VC");
   const roll=randomInt(1000000)/10000,w=caseOdds(cs);let rarity=0,total=0;
   for(let i=0;i<w.length;i++){total+=w[i];if(roll<total){rarity=i;break}}
   const pool=casePool(cs,DEMO_RARITIES[rarity]);if(!pool.length)throw Error("Для этой редкости нет карточек");const card=pool[randomInt(pool.length)];
-  u.balance-=cs.price;u.xp+=20;u.opens++;trackQuick(u,"opens");trackQuick(u,"itemsWon");u.inventory[card.id]=(u.inventory[card.id]||0)+1;u.collected=Object.keys(u.inventory).length;
+  if(token){u.caseInventory[cs.id]--;if(!u.caseInventory[cs.id])delete u.caseInventory[cs.id]}else u.balance-=cs.price;u.xp+=20;u.opens++;u.hourProgress ||= {};const hk=cycle(HOUR_MS);u.hourProgress[hk] ||= {opens:0};u.hourProgress[hk].opens++;trackQuick(u,"opens");trackQuick(u,"itemsWon");u.inventory[card.id]=(u.inventory[card.id]||0)+1;u.collected=Object.keys(u.inventory).length;
   const result={card,caseId:cs.id,balance:u.balance,xp:u.xp,opens:u.opens,inventory:u.inventory};
   u.operations[data.operationId]=result;
   if(Object.keys(u.operations).length>100)u.operations=Object.fromEntries(Object.entries(u.operations).slice(-100));
@@ -811,8 +811,8 @@ async function runAutoCases(caseId){
   for(let i=0;i<10&&!job.stopped;i++){
    if(user.balance<c.price)break;
    if(status)status.textContent="Открываем "+(i+1)+" / 10...";
-   const r=await call("openCase",{caseId,operationId:crypto.randomUUID()});
-   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;
+   const r=await call("openCase",{caseId,operationId:crypto.randomUUID(),useToken:!!$("#useCaseToken")?.checked});
+   user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.caseInventory=demoRead()?.caseInventory||{};user.collected=Object.keys(r.inventory).length;
    await cloudSync;if(cloudSaveError)throw cloudSaveError;
    done++;
    if(status)status.textContent="Получено: "+escape(r.card.name)+" · "+fmt(r.card.value)+" VC · "+done+"/10";
@@ -851,14 +851,14 @@ async function runAutoUpgrade(){
 }
 async function openCase(id){
  const c=cases.find(x=>x.id===id);if(!c)return;const w=caseOdds(c);
- show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC</p>'+oddsVisual(w)+'<h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div>'+autoControls("cases",id)+'<div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
+ show('<div class="eyebrow">CASE OPENING · VIDNESD</div><h2>'+c.emoji+' '+escape(c.name)+'</h2><p>Цена: '+fmt(c.price)+' VC</p>'+oddsVisual(w)+'<h3>Выбери способ открытия</h3><div class="opening-styles">'+OPEN_STYLES.map(([key,label])=>'<button class="style-choice '+(openingStyle===key?'selected':'')+'" data-style="'+key+'">'+label+'</button>').join("")+'</div><div class="opening-speed"><span>Длительность:</span>'+OPEN_DURATIONS.map(([key,label])=>'<button class="style-choice '+(openingDuration===key?'selected':'')+'" data-duration="'+key+'">'+label+'</button>').join("")+'</div><label class="vfx-toggle"><input type="checkbox" id="vfxToggle" '+(openingEffects?"checked":"")+' /> Спецэффекты: свечение, частицы, вспышки</label><div id="rollArea"><div class="case-art">'+c.emoji+'</div></div>'+(user.caseInventory?.[id]?'<label class="vfx-toggle"><input type="checkbox" id="useCaseToken" checked> Использовать кейс из инвентаря ('+user.caseInventory[id]+' шт.)</label>':'')+autoControls("cases",id)+'<div class="actions"><button id="startRoll" class="primary">Открыть за '+fmt(c.price)+' VC</button><button id="preview" class="secondary">Посмотреть карточки</button></div>');
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
  $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2><p>Шансы редкостей: '+w.map((v,i)=>v?["Обычная","Редкая","Эпическая","Легендарная"][i]+" "+v+"%":"").filter(Boolean).join(" · ")+'</p><div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
  $("#autoStart").onclick=()=>runAutoCases(id);$("#autoStop").onclick=stopAutoPlay;
  $("#startRoll").onclick=()=>lock(async()=>{
-  if(user.balance<c.price)throw Error("Недостаточно VC");
+  if(!$("#useCaseToken")?.checked&&user.balance<c.price)throw Error("Недостаточно VC");
   const chosenStyle=openingStyle,chosenDuration=openingDuration;
   $("#startRoll").disabled=true;document.querySelectorAll("[data-style],[data-duration]").forEach(b=>b.disabled=true);
   sfx.play("open");
