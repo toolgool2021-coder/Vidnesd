@@ -551,3 +551,9 @@ body.design-v44 #toast .toast,body.design-v44 .toast{background:#20313c;color:#e
  body.design-v44 footer{padding:22px 15px}
 }
 @media(prefers-reduced-motion:reduce){body.design-v44 .hero-art{animation:none}}
+
+/* v46 sound control */
+.sfx-toggle{background:transparent;border:1px solid #ffffff24;color:inherit;border-radius:12px;padding:9px 12px;white-space:nowrap;font:inherit;font-size:12px;cursor:pointer;transition:background .2s,border-color .2s}
+.sfx-toggle:hover{background:#ffffff0e;border-color:#ffffff55}
+.sfx-toggle[aria-pressed="false"]{opacity:.65}
+@media(max-width:640px){.sfx-toggle{padding:7px 9px;font-size:11px}}
