@@ -46,6 +46,31 @@ service cloud.firestore {
     }
 
 
+    // Owner-defined collectible cases. Drops are item IDs with exact percentage weights.
+    match /adminCases/{caseId} {
+      allow read: if signedIn();
+      allow create: if isOwner()
+        && caseId.matches('acase_[A-Za-z0-9_-]{20,}')
+        && request.resource.data.keys().hasOnly(['id','name','emoji','price','tier','adminCase','creator','drops'])
+        && request.resource.data.id == caseId
+        && request.resource.data.creator == request.auth.uid
+        && request.resource.data.adminCase == true
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 3
+        && request.resource.data.name.size() <= 40
+        && request.resource.data.emoji is string
+        && request.resource.data.emoji.size() >= 1
+        && request.resource.data.emoji.size() <= 8
+        && request.resource.data.price is int
+        && request.resource.data.price >= 1
+        && request.resource.data.price <= 100000000
+        && request.resource.data.tier == 3
+        && request.resource.data.drops is list
+        && request.resource.data.drops.size() >= 1
+        && request.resource.data.drops.size() <= 20;
+      allow update, delete: if false;
+    }
+
     // Transactional settlement: recipient may update sender's inventory ONLY
     // when a pending trade is accepted in the same atomic transaction.
     function validTradeSide(uid) {
