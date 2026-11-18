@@ -377,7 +377,7 @@ function close(){modal.classList.add("hidden");body.innerHTML=""}
 $("#authBtn").onclick=()=>{if(current){if(!auth)return toast("Авторизация ещё загружается");lock(async()=>{await signOut(auth);current=null;user=null;page="home";close();render();toast("Вы вышли из аккаунта")})}else if(auth)authModal();else toast("Подключение к Firebase ещё не завершено")};
 $("#closeModal").onclick=close;modal.addEventListener("click",e=>{if(e.target===modal)close()});
 const cardView=(c,count=0)=>'<div class="tile rarity-'+c.rarity+'"><div class="cardart"><span>'+c.emoji+'</span></div><div class="tag">'+c.rarity+'</div><b>'+escape(c.name)+'</b><p>'+fmt(c.value)+' VC'+(count?' · ×'+count:'')+'</p>'+(count?'<button class="secondary sell" data-id="'+c.id+'">Продать одну</button>':'')+'</div>';
-function caseView(c){return '<div class="case"><div class="case-art">'+c.emoji+'</div><div class="tag">'+(c.special?"Особый кейс":"Коллекция "+(c.tier+1))+'</div><h3>'+escape(c.name)+'</h3><div class="price">✦ '+fmt(c.price)+' VC</div><button class="primary open" data-id="'+c.id+'">Открыть кейс</button></div>'}
+function caseView(c){return '<div class="case"><div class="case-art">'+c.emoji+'</div><div class="tag">'+(c.adminCase?"Уникальный кейс":c.special?"Особый кейс":"Коллекция "+(c.tier+1))+'</div><h3>'+escape(c.name)+'</h3><div class="price">'+(c.adminCase?"Только по выдаче":"✦ "+fmt(c.price)+" VC")+'</div><button class="primary open" data-id="'+c.id+'" '+(c.adminCase&&!user?.caseInventory?.[c.id]?'disabled':'')+'>'+(c.adminCase?"Открыть из инвентаря":"Открыть кейс")+'</button></div>'}
 function stats(){return '<div class="stats"><div class="stat"><span class="muted">Баланс</span><b>'+fmt(user?.balance)+' VC</b></div><div class="stat"><span class="muted">Открытий</span><b>'+fmt(user?.opens)+'</b></div><div class="stat"><span class="muted">Опыт</span><b>'+fmt(user?.xp)+' XP</b></div></div>'}
 const OWNER_UID="3gXPMPACBeftCtoSGqC6mL5T2iw2";
 const isAdmin=()=>current?.uid===OWNER_UID;
@@ -928,15 +928,15 @@ async function openCase(id){
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
- $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2>'+oddsVisual(w)+'<div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
+ $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2>'+oddsVisual(w)+'<div class="grid">'+caseAvailable(c).map(x=>cardView(x)+(c.adminCase?'<div class="drop-chance">Шанс: '+c.drops.find(d=>d.cardId===x.id)?.chance+'%</div>':'' )).join("")+'</div>');
  if($("#autoStart"))$("#autoStart").onclick=()=>runAutoCases(id);if($("#autoStop"))$("#autoStop").onclick=stopAutoPlay;
  $("#startRoll").onclick=()=>lock(async()=>{
   if(c.adminCase&&!user.caseInventory?.[id])throw Error("Уникальный кейс уже израсходован");if(!c.adminCase&&!$("#useCaseToken")?.checked&&user.balance<c.price)throw Error("Недостаточно VC");
   const chosenStyle=openingStyle,chosenDuration=openingDuration;
   $("#startRoll").disabled=true;document.querySelectorAll("[data-style],[data-duration]").forEach(b=>b.disabled=true);
   sfx.play("open");
-  const r=await call("openCase",{caseId:id,operationId:crypto.randomUUID()});
-  user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
+  const r=await call("openCase",{caseId:id,operationId:crypto.randomUUID(),useToken:c.adminCase||!!$("#useCaseToken")?.checked});
+  user.balance=r.balance;user.xp=r.xp;user.opens=r.opens;user.inventory=r.inventory;user.caseInventory=r.caseInventory||demoRead()?.caseInventory||{};user.collected=Object.keys(r.inventory).length;$("#balance").textContent=fmt(user.balance);
   await waitCloudSave("Сохраняем выпавший предмет");
   const area=$("#rollArea");if(!area)return;
   const duration=chosenDuration==="epic"?12500:chosenDuration==="long"?9500:7200;
