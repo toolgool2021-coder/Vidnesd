@@ -339,6 +339,7 @@ if(page==="cases")app.innerHTML='<div class="section-head"><div><div class="eyeb
 if(page==="inventory"){const owned=cards.filter(c=>user.inventory?.[c.id]>0);app.innerHTML='<div class="eyebrow">MY COLLECTION</div><h1>Инвентарь</h1><p>Собрано '+owned.length+' из '+cards.length+' видов карточек</p>'+(owned.length?'<button class="primary" id="bulkSellBtn">Продать несколько предметов</button><div class="grid">'+owned.map(c=>cardView(c,user.inventory[c.id])).join("")+'</div>':'<div class="empty">Пока пусто. Открой первый кейс, чтобы получить карточку.</div>')}
 if(page==="admin"){renderAdmin();return}
 if(page==="trades"){renderTrades();return}
+if(page==="market"){renderMarket();return}
 if(page==="workshop"){renderWorkshop();return}
 if(page==="craft"){renderCraft();return}
 if(page==="upgrade"){renderUpgrade();return}
@@ -378,6 +379,80 @@ async function saveNickname(raw){
 async function publishTradeProfile(){return saveNickname(user.nick)}
 function tradeCardPicker(title,field,items){
  return '<div class="trade-picker"><div class="trade-picker-title">'+title+'</div><div class="trade-picker-grid"><label class="trade-card-choice"><input type="radio" name="'+field+'" value="" checked><span class="trade-card-art">∅</span><strong>Без предмета</strong><small>Только VC</small></label>'+items.map(c=>'<label class="trade-card-choice rarity-'+c.rarity+'"><input type="radio" name="'+field+'" value="'+escape(c.id)+'"><span class="trade-card-art">'+c.emoji+'</span><strong>'+escape(c.name)+'</strong><small>'+fmt(c.value)+' VC · '+escape(c.rarity)+'</small></label>').join("")+'</div></div>';
+}
+
+
+const marketCollection=()=>collection(db,"marketListings");
+function marketCard(id,listing){
+ const c=cards.find(x=>x.id===id)||{name:id,emoji:"🎴",rarity:"rare",value:0};
+ return '<span class="market-art">'+escape(c.emoji)+'</span><div><strong>'+escape(c.name)+'</strong><small>'+escape(c.rarity)+' · Оценка '+fmt(c.value)+' VC</small></div>';
+}
+async function marketAction(kind,id,details={}){
+ if(!cloudReady)throw Error("Сначала подключи облачное сохранение");
+ await cloudSync;
+ const uid=current.uid,profileRef=doc(db,"gameProfiles",uid);
+ const listingRef=kind==="list"?doc(marketCollection()):doc(db,"marketListings",id);
+ const updated=await runTransaction(db,async tx=>{
+  const listing=kind==="list"?null:await tx.get(listingRef);
+  const mine=await tx.get(profileRef);
+  if(!mine.exists())throw Error("Облачный профиль не найден");
+  const own=structuredClone(mine.data().state);
+  if(own.uid!==uid)throw Error("Ошибка владельца профиля");
+  if(kind==="list"){
+   const {cardId,price}=details;
+   if(!cards.some(c=>c.id===cardId))throw Error("Неизвестный предмет");
+   if(!Number.isSafeInteger(price)||price<1||price>100000000)throw Error("Укажи цену от 1 до 100 000 000 VC");
+   if(Number(own.inventory?.[cardId]||0)<1)throw Error("Предмета нет в инвентаре");
+   own.inventory[cardId]--;if(!own.inventory[cardId])delete own.inventory[cardId];
+   own.lastMarketId=listingRef.id;own.collected=Object.keys(own.inventory).length;
+   own.showcase=(own.showcase||[]).filter(x=>own.inventory[x]>0);
+   tx.set(listingRef,{seller:uid,cardId,price,status:"active",createdAt:serverTimestamp()});
+   tx.update(profileRef,{state:own,updatedAt:serverTimestamp()});
+  }else{
+   if(!listing.exists())throw Error("Объявление удалено");
+   const item=listing.data();
+   if(item.status!=="active")throw Error("Предмет уже куплен или снят с продажи");
+   if(kind==="cancel"){
+    if(item.seller!==uid)throw Error("Это не твоё объявление");
+    own.inventory[item.cardId]=(own.inventory[item.cardId]||0)+1;
+    own.lastMarketId=id;own.collected=Object.keys(own.inventory).length;
+    tx.update(listingRef,{status:"cancelled",closedAt:serverTimestamp()});
+    tx.update(profileRef,{state:own,updatedAt:serverTimestamp()});
+   }else if(kind==="buy"){
+    if(item.seller===uid)throw Error("Нельзя купить собственный предмет");
+    if(own.balance<item.price)throw Error("Недостаточно VC");
+    const sellerRef=doc(db,"gameProfiles",item.seller);
+    const sellerSnap=await tx.get(sellerRef);
+    if(!sellerSnap.exists())throw Error("Продавец недоступен");
+    const seller=structuredClone(sellerSnap.data().state);
+    if(seller.uid!==item.seller||seller.balance+item.price>1e9)throw Error("Невозможно начислить VC продавцу");
+    own.balance-=item.price;own.inventory[item.cardId]=(own.inventory[item.cardId]||0)+1;
+    own.lastMarketId=id;own.collected=Object.keys(own.inventory).length;
+    seller.balance+=item.price;seller.lastMarketId=id;
+    tx.update(profileRef,{state:own,updatedAt:serverTimestamp()});
+    tx.update(sellerRef,{state:seller,updatedAt:serverTimestamp()});
+    tx.update(listingRef,{status:"sold",buyer:uid,closedAt:serverTimestamp()});
+   }
+  }
+  return own;
+ });
+ const local=demoRead()||{};
+ user={...updated,operations:local.operations||{}};
+ localStorage.setItem(demoKey(),JSON.stringify(user));
+ sfx.play(kind==="buy"?"reward":"trade");
+ toast(kind==="list"?"Предмет перенесён на рынок":kind==="buy"?"Покупка завершена":"Предмет возвращён в инвентарь");
+ await renderMarket();
+}
+async function renderMarket(){
+ app.innerHTML='<div class="eyebrow">VIDNESD MARKET · PLAYER TO PLAYER</div><h1>Рынок предметов</h1><p>Выставленный предмет сразу покидает инвентарь и хранится в объявлении. Покупка, оплата и передача выполняются одной транзакцией.</p><section class="market-panel"><h2>Выставить предмет</h2><form id="marketForm" class="market-form"><select name="cardId" required><option value="">Выбери предмет</option>'+cards.filter(c=>user.inventory?.[c.id]>0).map(c=>'<option value="'+escape(c.id)+'">'+escape(c.name)+' · '+fmt(c.value)+' VC · '+user.inventory[c.id]+' шт.</option>').join("")+'</select><input name="price" type="number" min="1" max="100000000" placeholder="Цена в VC" required><button class="primary">Выставить</button></form></section><h2>Объявления игроков</h2><div id="marketList">Загрузка...</div>';
+ $("#marketForm").onsubmit=e=>{e.preventDefault();const data=new FormData(e.target);lock(()=>marketAction("list",null,{cardId:String(data.get("cardId")),price:Number(data.get("price"))}))};
+ try{
+  const docs=await getDocs(query(marketCollection(),where("status","==","active"),limit(100)));
+  if(page!=="market")return;
+  const listings=docs.docs.sort((a,b)=>(b.data().createdAt?.seconds||0)-(a.data().createdAt?.seconds||0));
+  $("#marketList").innerHTML=listings.length?'<div class="market-grid">'+listings.map(d=>{const x=d.data(),own=x.seller===current.uid;return '<article class="market-item">'+marketCard(x.cardId,x)+'<p>Продавец: '+escape(x.seller.slice(0,8))+'…</p><div class="market-bottom"><b>'+fmt(x.price)+' VC</b><button class="'+(own?"secondary":"primary")+' market-act" data-id="'+escape(d.id)+'" data-action="'+(own?"cancel":"buy")+'">'+(own?"Снять с продажи":"Купить")+'</button></div></article>'}).join("")+'</div>':'<div class="empty">Пока никто не выставил предметы.</div>';
+  document.querySelectorAll(".market-act").forEach(b=>b.onclick=()=>lock(()=>marketAction(b.dataset.action,b.dataset.id)));
+ }catch(e){$("#marketList").textContent="Не удалось загрузить рынок: "+(e.code||e.message)}
 }
 
 async function settleTrade(tradeId){
