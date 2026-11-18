@@ -273,3 +273,9 @@
 .bulk-sell-art{font-size:30px;text-align:center}.bulk-sell-row strong{display:block;font-size:13px;overflow-wrap:anywhere}.bulk-sell-row small{display:block;color:#aab4cf;font-size:11px}.bulk-sell-row input{width:100%;min-width:0;box-sizing:border-box}
 .bulk-sell-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:16px}
 #bulkSellBtn{margin:12px 0 20px}
+
+/* v40 upgrade selection feedback */
+.upgrade-inv-card.upgrade-picked{border:2px solid #9d83ff;background:linear-gradient(145deg,#312452,#20243d);box-shadow:0 0 18px #9874ff44;transform:translateY(-2px)}
+.upgrade-inv-card.upgrade-exhausted{filter:grayscale(1);opacity:.43;cursor:not-allowed;box-shadow:none;transform:none}
+.upgrade-selected-count,.upgrade-no-copies{display:block;font-size:11px;font-style:normal;font-weight:700;margin-top:5px;color:#c7b7ff}
+.upgrade-no-copies{color:#a6a9b1}
