@@ -557,3 +557,13 @@ body.design-v44 #toast .toast,body.design-v44 .toast{background:#20313c;color:#e
 .sfx-toggle:hover{background:#ffffff0e;border-color:#ffffff55}
 .sfx-toggle[aria-pressed="false"]{opacity:.65}
 @media(max-width:640px){.sfx-toggle{padding:7px 9px;font-size:11px}}
+
+/* Player marketplace */
+.market-panel{padding:22px;margin:22px 0;border:1px solid var(--border,rgba(255,255,255,.12));border-radius:18px;background:rgba(120,140,180,.055)}
+.market-form{display:grid;grid-template-columns:minmax(0,2fr) minmax(120px,1fr) auto;gap:10px}
+.market-form select,.market-form input{min-width:0;padding:12px;border-radius:12px;background:var(--surface,#151b25);color:inherit;border:1px solid rgba(160,180,210,.22)}
+.market-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.market-item{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:14px;padding:18px;border:1px solid rgba(160,180,210,.18);border-radius:18px;background:rgba(120,140,180,.055)}
+.market-item small{display:block;opacity:.65;margin-top:5px}.market-art{font-size:36px}.market-item>p,.market-bottom{grid-column:1/-1}.market-item>p{font-size:12px;opacity:.65;margin:0}
+.market-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px}.market-bottom b{font-size:19px}
+@media(max-width:620px){.market-form{grid-template-columns:1fr}.market-panel{padding:14px}}
