@@ -64,7 +64,7 @@ service cloud.firestore {
     match /leaderboard/{uid} {
       allow read: if true;
       allow create, update: if isSelf(uid)
-        && request.resource.data.keys().hasOnly(['nick','xp','opens','updatedAt'])
+        && request.resource.data.keys().hasOnly(['nick','xp','opens','inventoryValue','updatedAt'])
         && request.resource.data.nick is string
         && request.resource.data.nick.size() >= 1
         && request.resource.data.nick.size() <= 20
@@ -74,6 +74,9 @@ service cloud.firestore {
         && request.resource.data.opens is int
         && request.resource.data.opens >= 0
         && request.resource.data.opens <= 1000000000
+        && request.resource.data.inventoryValue is int
+        && request.resource.data.inventoryValue >= 0
+        && request.resource.data.inventoryValue <= 1000000000000
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
