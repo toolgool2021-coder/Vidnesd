@@ -127,7 +127,7 @@ for(let i=160;i<DEMO_CARDS.length;i++){
  card.value=band[0]+((i*131+i*i*17+79)%(band[1]-band[0]+1));
 }
 const DEMO_WEIGHTS=[[88,10,1.8,.2],[83,13,3.6,.4],[76,18,5.3,.7],[68,23,8,1]];
-function caseOdds(c){return c.odds?c.odds.map((v,i)=>i===3?Math.min(v,1):v):DEMO_WEIGHTS[c.tier]||DEMO_WEIGHTS[0]}
+function caseOdds(c){if(!c.odds)return DEMO_WEIGHTS[c.tier]||DEMO_WEIGHTS[0];const w=[...c.odds],rare=Math.min(1,Number(w[3])||0),others=w.slice(0,3).reduce((a,b)=>a+Number(b||0),0);if(others<=0)return [100-rare,0,0,rare];return [...w.slice(0,3).map(x=>Number((Number(x||0)*(100-rare)/others).toFixed(3))),rare]}
 function oddsVisual(w){const names=["Обычная","Редкая","Эпическая","Легендарная"];return '<div class="odds-panel"><div class="odds-heading">Вероятности выпадения</div><div class="odds-bar">'+w.map((v,i)=>'<span class="odds-fill odds-'+i+'" style="width:'+v+'%"></span>').join("")+'</div><div class="odds-legend">'+w.map((v,i)=>'<div class="odds-line odds-'+i+'"><span class="odds-dot"></span><span>'+names[i]+'</span><strong>'+v+'%</strong></div>').join("")+'</div></div>'}
 function casePool(c,rarity){return DEMO_CARDS.filter(card=>card.rarity===rarity&&(!c.special||(card.value>=c.minValue&&card.value<=c.maxValue)))}
 function caseAvailable(c){return DEMO_RARITIES.flatMap((rarity,i)=>caseOdds(c)[i]>0?casePool(c,rarity):[])}
@@ -857,7 +857,7 @@ async function openCase(id){
  document.querySelectorAll("[data-style]").forEach(b=>b.onclick=()=>{openingStyle=b.dataset.style;document.querySelectorAll("[data-style]").forEach(x=>x.classList.toggle("selected",x===b))});
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
- $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2><p>Шансы редкостей: '+w.map((v,i)=>v?["Обычная","Редкая","Эпическая","Легендарная"][i]+" "+v+"%":"").filter(Boolean).join(" · ")+'</p><div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
+ $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2>'+oddsVisual(w)+'<div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
  $("#autoStart").onclick=()=>runAutoCases(id);$("#autoStop").onclick=stopAutoPlay;
  $("#startRoll").onclick=()=>lock(async()=>{
   if(!$("#useCaseToken")?.checked&&user.balance<c.price)throw Error("Недостаточно VC");
