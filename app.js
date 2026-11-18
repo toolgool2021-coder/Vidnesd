@@ -799,10 +799,12 @@ async function playOpening(area,style,win,duration){
 let autoPlay=null;
 function stopAutoPlay(){if(autoPlay){autoPlay.stopped=true;autoPlay=null}const el=document.getElementById("autoPlayStatus");if(el)el.textContent="Автоматический режим остановлен"}
 function autoControls(kind,id){
+ if(!isAdmin())return "";
  const running=autoPlay&&!autoPlay.stopped;
  return '<div class="auto-play-panel"><div><strong>Автоматический режим</strong><p>До 10 операций подряд. Каждая операция сохраняется в Firebase. Остановится при нехватке VC, предметов или ошибке.</p></div><div class="auto-play-actions"><button class="secondary" id="autoStart" '+(running?'disabled':'')+'>▶ Авто ×10</button><button class="secondary" id="autoStop" '+(!running?'disabled':'')+'>■ Остановить</button></div><small id="autoPlayStatus">'+(running?'Выполняется...':'Не запущен')+'</small></div>';
 }
 async function runAutoCases(caseId){
+ if(!isAdmin())throw Error("Автооткрытие доступно только владельцу");
  if(autoPlay||busy)return;
  if(!cloudReady)return toast("Автоматический режим требует доступного Firebase");
  const c=cases.find(x=>x.id===caseId);if(!c)return;
@@ -858,7 +860,7 @@ async function openCase(id){
  document.querySelectorAll("[data-duration]").forEach(b=>b.onclick=()=>{openingDuration=b.dataset.duration;document.querySelectorAll("[data-duration]").forEach(x=>x.classList.toggle("selected",x===b))});
  $("#vfxToggle").onchange=e=>{openingEffects=e.target.checked};
  $("#preview").onclick=()=>show('<h2>Возможные награды · '+escape(c.name)+'</h2>'+oddsVisual(w)+'<div class="grid">'+caseAvailable(c).map(x=>cardView(x)).join("")+'</div>');
- $("#autoStart").onclick=()=>runAutoCases(id);$("#autoStop").onclick=stopAutoPlay;
+ if($("#autoStart"))$("#autoStart").onclick=()=>runAutoCases(id);if($("#autoStop"))$("#autoStop").onclick=stopAutoPlay;
  $("#startRoll").onclick=()=>lock(async()=>{
   if(!$("#useCaseToken")?.checked&&user.balance<c.price)throw Error("Недостаточно VC");
   const chosenStyle=openingStyle,chosenDuration=openingDuration;
