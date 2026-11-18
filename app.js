@@ -404,6 +404,7 @@ async function settleTrade(tradeId){
   from.balance=from.balance-offerVC+wantVC;to.balance=to.balance-wantVC+offerVC;
   if(from.balance>1e9||to.balance>1e9)throw Error("Превышен лимит баланса");
   for(const p of [from,to]){p.collected=Object.keys(p.inventory).length;p.showcase=(p.showcase||[]).filter(id=>p.inventory[id]>0)}
+  from.lastTradeId=tradeId;to.lastTradeId=tradeId;
   tx.update(senderRef,{state:from,updatedAt:serverTimestamp()});
   tx.update(receiverRef,{state:to,updatedAt:serverTimestamp()});
   tx.update(ref,{status:"accepted",settledAt:serverTimestamp()});
