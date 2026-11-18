@@ -45,10 +45,44 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+
+    // Transactional settlement: recipient may update sender's inventory ONLY
+    // when a pending trade is accepted in the same atomic transaction.
+    function validTradeSide(uid) {
+      let id = request.resource.data.state.get('lastTradeId', '');
+      let before = get(/databases/$(database)/documents/tradeRequests/$(id)).data;
+      let after = getAfter(/databases/$(database)/documents/tradeRequests/$(id)).data;
+      let old = resource.data.state;
+      let next = request.resource.data.state;
+      let senderSide = uid == before.sender;
+      let give = senderSide ? before.offerCard : before.wantCard;
+      let take = senderSide ? before.wantCard : before.offerCard;
+      let paid = senderSide ? before.offerVC : before.wantVC;
+      let received = senderSide ? before.wantVC : before.offerVC;
+      return signedIn()
+        && id is string && id.size() >= 10 && id.size() <= 128
+        && before.status == 'pending' && after.status == 'accepted'
+        && before.recipient == request.auth.uid
+        && uid in [before.sender,before.recipient]
+        && request.resource.data.keys().hasOnly(['state','updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && next.uid == uid && next.lastTradeId == id
+        && next.diff(old).affectedKeys().hasOnly(['inventory','balance','collected','showcase','lastTradeId'])
+        && old.inventory is map && next.inventory is map
+        && old.balance is number && next.balance is number
+        && old.balance >= paid && next.balance == old.balance - paid + received
+        && next.balance >= 0 && next.balance <= 1000000000
+        && next.inventory.diff(old.inventory).affectedKeys().hasOnly([give,take])
+        && (give == '' || (old.inventory.get(give,0) >= 1
+             && next.inventory.get(give,0) == old.inventory.get(give,0) - 1))
+        && (take == '' || next.inventory.get(take,0) == old.inventory.get(take,0) + 1);
+    }
+
     // Prototype account-based save. Client-writable: not anti-cheat secure.
     match /gameProfiles/{uid} {
-      allow read: if isSelf(uid) || isOwner();
-      allow create, update: if isOwner() || isSelf(uid)
+      allow get: if signedIn();
+      allow list: if isOwner();
+      allow create, update: if validTradeSide(uid) || isOwner() || isSelf(uid)
         && request.resource.data.keys().hasOnly(['state','updatedAt'])
         && request.resource.data.state is map
         && request.resource.data.state.uid == uid
@@ -123,7 +157,7 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Proposals are not actual asset transfers.
+    // Trades settle inventory and VC atomically with gameProfiles.
     match /tradeRequests/{tradeId} {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly(['sender','recipient','offerCard','wantCard','offerVC','wantVC','status','createdAt'])
@@ -148,8 +182,13 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.recipient == request.auth.uid
         && resource.data.status == 'pending'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
-        && request.resource.data.status in ['accepted','declined'];
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+             && request.resource.data.status == 'declined')
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','settledAt'])
+             && request.resource.data.status == 'accepted'
+             && request.resource.data.settledAt == request.time
+             && getAfter(/databases/$(database)/documents/gameProfiles/$(resource.data.sender)).data.state.lastTradeId == tradeId
+             && getAfter(/databases/$(database)/documents/gameProfiles/$(resource.data.recipient)).data.state.lastTradeId == tradeId));
       allow delete: if false;
     }
 
