@@ -245,7 +245,22 @@ async function call(name,data={}){
  if(name==="claimDaily"){const day=new Date().toISOString().slice(0,10);if(u.lastDaily===day)throw Error("Сегодня награда уже получена");u.balance+=150;u.lastDaily=day;demoWrite(u);return {balance:u.balance,lastDaily:day,reward:150}}
  if(name==="claimHourly"){const k=cycle(HOUR_MS),q=hourlyQuests(k).find(x=>x.id===data.questId);if(!q)throw Error("Задание обновилось");u.claimed ||= {};if(u.claimed[q.id])throw Error("Уже получено");if(Number(u.hourProgress?.[k]?.opens||0)<q.target)throw Error("Задание не выполнено");u.caseInventory ||= {};u.caseInventory[q.caseId]=(u.caseInventory[q.caseId]||0)+1;u.claimed[q.id]=true;demoWrite(u);return {caseInventory:u.caseInventory,claimed:u.claimed}}
 if(name==="claimQuest"){const k=cycle(QUICK_MS),q=quickQuests(k).find(x=>x.id===data.questId);if(!q)throw Error("Задание обновилось");u.claimed ||= {};if(u.claimed[q.id])throw Error("Уже получено");if(Number(u.quickProgress?.[k]?.[q.field]||0)<q.target)throw Error("Задание ещё не выполнено");if(u.balance+q.reward>1e9)throw Error("Лимит VC");u.claimed[q.id]=true;u.balance+=q.reward;demoWrite(u);return {balance:u.balance,claimed:u.claimed,reward:q.reward}}
- if(name==="deliverQuest"){const k=cycle(DELIVERY_MS),q=deliveryQuests(k).find(x=>x.id===data.questId);if(!q)throw Error("Заказ обновился");u.claimed ||= {};if(u.claimed[q.id])throw Error("Заказ выполнен");if(Number(u.inventory[q.cardId]||0)<q.quantity)throw Error("Недостаточно карточек");if(u.balance+q.reward>1e9)throw Error("Лимит VC");u.inventory[q.cardId]-=q.quantity;if(!u.inventory[q.cardId])delete u.inventory[q.cardId];u.claimed[q.id]=true;u.balance+=q.reward;u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);return {balance:u.balance,inventory:u.inventory,collected:u.collected,showcase:u.showcase,claimed:u.claimed,reward:q.reward}}
+ if(name==="deliverQuest"){
+ const k=cycle(DELIVERY_MS),q=deliveryQuests(k).find(x=>x.id===data.questId);if(!q)throw Error("Заказ обновился");
+ u.claimed ||= {};if(u.claimed[q.id])throw Error("Заказ выполнен");
+ if(Number(u.inventory[q.cardId]||0)<q.quantity)throw Error("Недостаточно карточек");
+ const rewardType=["vc","card","case"][randomInt(3)];
+ let reward={type:rewardType};
+ if(rewardType==="vc"){if(u.balance+q.reward>1e9)throw Error("Лимит VC");reward={type:"vc",amount:q.reward};u.balance+=q.reward}
+ if(rewardType==="card"){
+  const pool=DEMO_CARDS.filter(c=>c.value>q.value&&c.value<=Math.max(q.value*2,q.value+100));
+  if(pool.length){const card=pool[randomInt(pool.length)];u.inventory[card.id]=(u.inventory[card.id]||0)+1;reward={type:"card",card}}else{if(u.balance+q.reward>1e9)throw Error("Лимит VC");u.balance+=q.reward;reward={type:"vc",amount:q.reward}}
+ }
+ if(rewardType==="case"){const pool=DEMO_CASES.filter(c=>c.price>=q.value&&c.price<=q.value*3);const cs=(pool.length?pool:DEMO_CASES)[randomInt((pool.length?pool:DEMO_CASES).length)];u.caseInventory ||= {};u.caseInventory[cs.id]=(u.caseInventory[cs.id]||0)+1;reward={type:"case",caseId:cs.id,name:cs.name}}
+ u.inventory[q.cardId]-=q.quantity;if(!u.inventory[q.cardId])delete u.inventory[q.cardId];
+ u.claimed[q.id]=true;u.collected=Object.keys(u.inventory).length;u.showcase=(u.showcase||[]).filter(id=>u.inventory[id]);demoWrite(u);
+ return {balance:u.balance,inventory:u.inventory,caseInventory:u.caseInventory||{},collected:u.collected,showcase:u.showcase,claimed:u.claimed,reward};
+ }
  if(name==="sellBulk"){
   const items=Array.isArray(data.items)?data.items:[];
   if(!items.length||items.length>300)throw Error("Выбери от 1 до 300 видов карточек");
